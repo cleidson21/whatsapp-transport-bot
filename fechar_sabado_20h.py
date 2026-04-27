@@ -134,30 +134,13 @@ def gerar_resumo_coordenacao_com_ia(texto_sabado, data_formatada):
     * VOLTA às 12h: [quantidade]
     """
     
-    # ====== SISTEMA DE RETRY PARA A IA (Evita o erro 503) ======
-    tentativas = 3
-    for tentativa in range(tentativas):
-        try:
-            logging.info(f"🧠 IA analisando dados do Sábado... (Tentativa {tentativa + 1}/{tentativas})")
-            resposta = client.models.generate_content(
-                model='gemini-2.5-flash',
-                contents=prompt
-            )
-            return normalizar_resumo_ia(resposta.text)
-        except Exception as e:
-            erro_msg = str(e)
-            logging.error(f"Falha na API da IA: {erro_msg}")
-            
-            if "503" in erro_msg or "UNAVAILABLE" in erro_msg or "429" in erro_msg:
-                if tentativa < tentativas - 1:
-                    espera = (tentativa + 1) * 10
-                    logging.info(f"⏳ Servidor do Google sobrecarregado. Aguardando {espera}s para tentar de novo...")
-                    time.sleep(espera)
-                else:
-                    logging.critical("❌ Todas as tentativas da IA falharam.")
-                    return f"Erro na IA após {tentativas} tentativas: {erro_msg}"
-            else:
-                return f"Erro na IA: {erro_msg}"
+    return gerar_texto_ia_com_fallback(
+        client=client,
+        prompt=prompt,
+        normalizar_func=normalizar_resumo_ia,
+        logger=logging,
+        contexto="[SÁBADO] ",
+    )
 
 # --- FUNÇÕES DE NAVEGAÇÃO WHATSAPP ---
 
@@ -228,8 +211,9 @@ def enviar_msg_chat_simples(mensagem):
 
 def enviar_msg_chat_multilinha(texto):
     try:
+        xpath_caixa = "//div[@contenteditable='true' and @role='textbox'] | //footer//div[@contenteditable='true'] | //div[@contenteditable='true'][@data-tab='10']"
         caixa = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.XPATH, "//div[@contenteditable='true'][@data-tab='10']"))
+            EC.presence_of_element_located((By.XPATH, xpath_caixa))
         )
         caixa.click()
         for linha in texto.split('\n'):
@@ -278,13 +262,15 @@ try:
                 driver.execute_script("arguments[0].scrollIntoView(true);", btn)
                 time.sleep(1)
                 btn.click()
-                
+
                 if tentar_fechar_grupo(grupo):
                     grupos_fechados += 1
-                    voltar_fechar_paineis()
-                    enviar_msg_chat_simples(MENSAGEM_FECHAMENTO)
+                    logging.info(f"📣 Enviando aviso de fechamento para {grupo}.")
                 else:
-                    voltar_fechar_paineis()
+                    logging.info(f"📣 Grupo {grupo} já estava fechado; enviando aviso mesmo assim.")
+
+                voltar_fechar_paineis()
+                enviar_msg_chat_simples(MENSAGEM_FECHAMENTO)
                     
             except Exception as e:
                 logging.error(f"❌ Erro fatal no fluxo do grupo {grupo}: {e}")
@@ -298,11 +284,20 @@ try:
     logging.info("A gerar relatório unificado com IA...")
     # Formata a data de amanhã (ex: 21/03) - pois o script roda sexta-feira à noite
     data_amanha = (datetime.now() + timedelta(days=1)).strftime("%d/%m")
-    
-    resumo_ia = gerar_resumo_coordenacao_com_ia(
-        texto_sabado=textos_coletados.get(GRUPOS_ALVO[0], ""),
-        data_formatada=data_amanha
-    )
+
+    try:
+        logging.info(
+            "🧠 Iniciando IA com textos: Sábado=%s",
+            len(textos_coletados.get(GRUPOS_ALVO[0], "")),
+        )
+        resumo_ia = gerar_resumo_coordenacao_com_ia(
+            texto_sabado=textos_coletados.get(GRUPOS_ALVO[0], ""),
+            data_formatada=data_amanha
+        )
+        logging.info("✅ IA concluída. Tamanho do resumo: %s caracteres.", len(resumo_ia))
+    except Exception as e:
+        logging.error(f"Falha inesperada na etapa da IA: {e}")
+        resumo_ia = f"Erro ao gerar resumo da IA: {e}"
 
     if clicar_grupo(GRUPO_COORDENACAO):
         logging.info("A enviar quantitativos para a coordenação...")

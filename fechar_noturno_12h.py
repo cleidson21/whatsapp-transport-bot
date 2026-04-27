@@ -14,6 +14,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 
 LOG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "whatsapp_automacao.log")
 from google import genai
+from ia_fallback_helper import gerar_texto_ia_com_fallback
 
 # ====== CONFIGURAÇÃO DE LOGS (NOVO) ======
 # Grava tudo na tela E num arquivo de texto para auditoria
@@ -165,31 +166,13 @@ def gerar_resumo_coordenacao_com_ia(t_senai, t_uefs, t_unef, t_unifacs, t_fat, t
     * FTC - [quantidade]
     """
     
-    # ====== SISTEMA DE RETRY PARA A IA (Evita o erro 503) ======
-    tentativas = 3
-    for tentativa in range(tentativas):
-        try:
-            logging.info(f"🧠 IA analisando 7 listas e calculando o valor máximo de cada rota... (Tentativa {tentativa + 1}/{tentativas})")
-            resposta = client.models.generate_content(
-                model='gemini-2.5-flash',
-                contents=prompt
-            )
-            return normalizar_resumo_ia(resposta.text)
-        except Exception as e:
-            erro_msg = str(e)
-            logging.error(f"Falha na API da IA: {erro_msg}")
-            
-            # Se for erro de servidor indisponível ou limite de taxa, ele espera e tenta de novo
-            if "503" in erro_msg or "UNAVAILABLE" in erro_msg or "429" in erro_msg:
-                if tentativa < tentativas - 1:
-                    espera = (tentativa + 1) * 10 # Espera 10s, depois 20s...
-                    logging.info(f"⏳ Servidor do Google sobrecarregado. Aguardando {espera}s para tentar de novo...")
-                    time.sleep(espera)
-                else:
-                    logging.critical("❌ Todas as tentativas da IA falharam.")
-                    return f"Erro na IA após {tentativas} tentativas: {erro_msg}"
-            else:
-                return f"Erro na IA: {erro_msg}"
+    return gerar_texto_ia_com_fallback(
+        client=client,
+        prompt=prompt,
+        normalizar_func=normalizar_resumo_ia,
+        logger=logging,
+        contexto="[NOTURNO] ",
+    )
 
 # --- FUNÇÕES DE NAVEGAÇÃO WHATSAPP ---
 
@@ -251,8 +234,9 @@ def enviar_msg_chat_simples(mensagem):
 
 def enviar_msg_chat_multilinha(texto):
     try:
+        xpath_caixa = "//div[@contenteditable='true' and @role='textbox'] | //footer//div[@contenteditable='true'] | //div[@contenteditable='true'][@data-tab='10']"
         caixa = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.XPATH, "//div[@contenteditable='true'][@data-tab='10']"))
+            EC.presence_of_element_located((By.XPATH, xpath_caixa))
         )
         caixa.click()
         for linha in texto.split('\n'):
@@ -299,12 +283,14 @@ try:
                 driver.execute_script("arguments[0].scrollIntoView(true);", btn_perm)
                 time.sleep(1)
                 btn_perm.click()
-                
+
                 if tentar_fechar_grupo(grupo):
-                    voltar_fechar_paineis()
-                    enviar_msg_chat_simples(MENSAGEM_FECHAMENTO)
+                    logging.info(f"📣 Enviando aviso de fechamento para {grupo}.")
                 else:
-                    voltar_fechar_paineis()
+                    logging.info(f"📣 Grupo {grupo} já estava fechado; enviando aviso mesmo assim.")
+
+                voltar_fechar_paineis()
+                enviar_msg_chat_simples(MENSAGEM_FECHAMENTO)
                     
             except Exception as e:
                 logging.error(f"❌ Erro fatal no fluxo do grupo {grupo}: {e}")
@@ -313,18 +299,33 @@ try:
     # 2. IA PROCESSA OS DADOS COLETADOS
     logging.info("A gerar relatório unificado com IA...")
     data_amanha = (datetime.now() + timedelta(days=1)).strftime("%d/%m")
-    
-    # Passa as variáveis garantindo a ordem definida na lista GRUPOS_ALVO
-    resumo_ia = gerar_resumo_coordenacao_com_ia(
-        t_senai=textos_coletados.get(GRUPOS_ALVO[0], ""),
-        t_uefs=textos_coletados.get(GRUPOS_ALVO[1], ""),
-        t_unef=textos_coletados.get(GRUPOS_ALVO[2], ""),
-        t_unifacs=textos_coletados.get(GRUPOS_ALVO[3], ""),
-        t_fat=textos_coletados.get(GRUPOS_ALVO[4], ""),
-        t_fan=textos_coletados.get(GRUPOS_ALVO[5], ""),
-        t_ftc=textos_coletados.get(GRUPOS_ALVO[6], ""),
-        data_formatada=data_amanha
-    )
+
+    try:
+        logging.info(
+            "🧠 Iniciando IA com textos: SENAI=%s, UEFS=%s, UNEF=%s, UNIFACS=%s, FAT=%s, FAN=%s, FTC=%s",
+            len(textos_coletados.get(GRUPOS_ALVO[0], "")),
+            len(textos_coletados.get(GRUPOS_ALVO[1], "")),
+            len(textos_coletados.get(GRUPOS_ALVO[2], "")),
+            len(textos_coletados.get(GRUPOS_ALVO[3], "")),
+            len(textos_coletados.get(GRUPOS_ALVO[4], "")),
+            len(textos_coletados.get(GRUPOS_ALVO[5], "")),
+            len(textos_coletados.get(GRUPOS_ALVO[6], "")),
+        )
+        # Passa as variáveis garantindo a ordem definida na lista GRUPOS_ALVO
+        resumo_ia = gerar_resumo_coordenacao_com_ia(
+            t_senai=textos_coletados.get(GRUPOS_ALVO[0], ""),
+            t_uefs=textos_coletados.get(GRUPOS_ALVO[1], ""),
+            t_unef=textos_coletados.get(GRUPOS_ALVO[2], ""),
+            t_unifacs=textos_coletados.get(GRUPOS_ALVO[3], ""),
+            t_fat=textos_coletados.get(GRUPOS_ALVO[4], ""),
+            t_fan=textos_coletados.get(GRUPOS_ALVO[5], ""),
+            t_ftc=textos_coletados.get(GRUPOS_ALVO[6], ""),
+            data_formatada=data_amanha
+        )
+        logging.info("✅ IA concluída. Tamanho do resumo: %s caracteres.", len(resumo_ia))
+    except Exception as e:
+        logging.error(f"Falha inesperada na etapa da IA: {e}")
+        resumo_ia = f"Erro ao gerar resumo da IA: {e}"
 
     # 3. ENVIA PARA A COORDENAÇÃO IMEDIATAMENTE
     if clicar_grupo(GRUPO_COORDENACAO):
