@@ -2,12 +2,24 @@
 
 Automacao em Python para gerenciar grupos de transporte universitario no WhatsApp Web.
 
+Este projeto foi pensado para operacao diaria: abrir grupos nos horarios certos, enviar avisos, fechar listas e consolidar quantitativos para a coordenacao.
+
 ## O que este projeto faz
 
 - Abre grupos e ativa envio de mensagens (scripts de abertura)
 - Envia avisos antes do fechamento das listas
 - Fecha grupos, extrai listas e gera quantitativos com IA
 - Envia resumo para o grupo de coordenacao
+
+## Funcionalidades principais
+
+- Abertura automatica de grupos por turno (manha, tarde, noite e sabado)
+- Fechamento automatizado de permissao de envio nos grupos
+- Captura da ultima lista relevante no chat (com tentativa de expandir "Ler mais")
+- Processamento via IA para consolidar quantitativos por rota/turno
+- Normalizacao de formato da mensagem para evitar marcadores duplicados no WhatsApp
+- Logs de execucao em arquivo e no console para auditoria
+- Reaproveitamento de sessao do WhatsApp Web via perfil fixo do Chrome
 
 ## Estrutura principal
 
@@ -23,6 +35,13 @@ Automacao em Python para gerenciar grupos de transporte universitario no WhatsAp
 - `fechar_sabado_20h.py`
 - `warmup_whatsapp.py`
 
+## Fluxo operacional (resumo)
+
+1. Scripts de abertura habilitam envio de mensagens nos grupos.
+2. Scripts de aviso notificam o fechamento com antecedencia.
+3. Scripts de fechamento bloqueiam envio, extraem listas e geram quantitativos com IA.
+4. Resultado final e enviado ao grupo de coordenacao.
+
 ## Requisitos
 
 - Python 3.10+
@@ -35,8 +54,14 @@ Automacao em Python para gerenciar grupos de transporte universitario no WhatsAp
 ```bash
 python -m venv .venv
 .venv\Scripts\activate
-pip install selenium webdriver-manager google-genai
+pip install -r requirements.txt
 ```
+
+Dependencias usadas:
+
+- `selenium`
+- `webdriver-manager`
+- `google-genai`
 
 ## Configuracao da chave da IA
 
@@ -46,6 +71,10 @@ pip install selenium webdriver-manager google-genai
 ```python
 GOOGLE_API_KEY = "sua_chave_aqui"
 ```
+
+Observacao:
+
+- `api_key_config.py` esta no `.gitignore` e nao sobe para o GitHub.
 
 ## Execucao
 
@@ -57,16 +86,35 @@ python aviso_matutino_1930.py
 python fechar_noturno_12h.py
 ```
 
+Sugestao de ordem em ambiente real:
+
+1. `warmup_whatsapp.py`
+2. Script de abertura do turno
+3. Script de aviso do turno
+4. Script de fechamento do turno
+
+## Agendador de Tarefas (Windows)
+
+Para cada tarefa, configure:
+
+- Programa/script: caminho do `python.exe`
+- Iniciar em: pasta do projeto
+- Argumentos: nome do script (ex: `fechar_noturno_12h.py`)
+
+Isso evita erro de caminho relativo e garante que o perfil local do Chrome seja usado corretamente.
+
 ## Observacoes importantes
 
 - Os scripts usam um perfil Chrome local para manter a sessao do WhatsApp.
 - O arquivo de log `whatsapp_automacao.log` e gerado localmente e ignorado no Git.
 - A pasta `Teste/` esta ignorada no Git para nao subir scripts de validacao local.
+- O primeiro login no WhatsApp Web deve ser feito manualmente nesse perfil.
 
 ## Seguranca
 
 - Nao versione sua chave da API.
 - O arquivo `api_key_config.py` esta no `.gitignore` e nao sera enviado ao GitHub.
+- Revogue e gere nova chave imediatamente se ela for exposta por engano.
 
 ## Licenca
 
