@@ -1,0 +1,26 @@
+# Python cache and artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Local environment files
+.env
+api_key_config.py
+
+# Logs
+*.log
+whatsapp_automacao.log
+
+# Tests and local experiments
+Teste/
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
