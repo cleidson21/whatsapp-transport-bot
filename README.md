@@ -21,6 +21,15 @@ Este projeto foi pensado para operacao diaria: abrir grupos nos horarios certos,
 - Logs de execucao em arquivo e no console para auditoria
 - Reaproveitamento de sessao do WhatsApp Web via perfil fixo do Chrome
 
+## Novidades recentes
+
+- Fallback automatico de modelos Gemini para reduzir falhas por indisponibilidade momentanea
+- Ordem padrao de fallback da IA: `gemini-2.5-flash` -> `gemini-3.1-flash` -> `gemini-3.1-flash-lite` -> `gemini-2.5-pro`
+- Retry com backoff exponencial para erros temporarios (`503`, `429`, `UNAVAILABLE`)
+- Logs detalhados da etapa da IA (inicio, tentativas por modelo, troca de modelo e resultado)
+- Envio de aviso de fechamento mesmo quando o grupo ja esta fechado
+- Seletor de caixa de mensagem mais robusto para envio de relatorio no WhatsApp Web
+
 ## Estrutura principal
 
 - `abrir_grupos_07h.py`
@@ -33,6 +42,7 @@ Este projeto foi pensado para operacao diaria: abrir grupos nos horarios certos,
 - `fechar_vespertino_10h.py`
 - `fechar_noturno_12h.py`
 - `fechar_sabado_20h.py`
+- `ia_fallback_helper.py`
 - `warmup_whatsapp.py`
 
 ## Fluxo operacional (resumo)
