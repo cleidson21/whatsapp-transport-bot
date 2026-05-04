@@ -31,7 +31,7 @@ opts.add_argument("--profile-directory=Default")
 
 # Inicia o Driver Indetetável
 logging.info("Iniciando o Undetected Chrome...")
-driver = uc.Chrome(options=opts)
+driver = uc.Chrome(options=opts, version_main=147)
 driver.maximize_window()
 
 # ====== LISTA DE GRUPOS PARA ABRIR ======

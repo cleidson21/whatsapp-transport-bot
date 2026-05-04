@@ -32,7 +32,7 @@ opts.add_argument("--profile-directory=Default")
 logging.info("🔥 A iniciar Warm-up do WhatsApp Web no Windows com Undetected Chrome...")
 
 # Inicia o Driver Indetetável
-driver = uc.Chrome(options=opts)
+driver = uc.Chrome(options=opts, version_main=147)
 driver.maximize_window()
 
 try:
