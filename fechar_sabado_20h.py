@@ -2,20 +2,16 @@ import os
 import time
 import humanizer
 import logging
-import re
-from datetime import datetime, timedelta
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
+import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.chrome import ChromeDriverManager
 
 LOG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "whatsapp_automacao.log")
 
 # ====== CONFIGURAÇÃO DE LOGS ======
+# Grava tudo na tela E num arquivo de texto para auditoria
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(levelname)s] %(message)s',
@@ -31,14 +27,15 @@ logging.basicConfig(
 usuario_windows = os.getlogin()
 perfil_path = rf"C:\Users\{usuario_windows}\Documents\WhatsApp_Bot_Profile"
 
-opts = Options()
+# Usamos uc.ChromeOptions() em vez das Options padrão do Selenium
+opts = uc.ChromeOptions()
 opts.add_argument(f"--user-data-dir={perfil_path}")
 opts.add_argument("--profile-directory=Default")
-opts.add_argument("--start-maximized")
-opts.add_experimental_option("excludeSwitches", ["enable-logging"])
 
-service = Service(ChromeDriverManager().install())
-driver = webdriver.Chrome(service=service, options=opts)
+# Inicia o Driver Indetetável
+logging.info("Iniciando o Undetected Chrome...")
+driver = uc.Chrome(options=opts)
+driver.maximize_window()
 
 # ====== CONFIGURAÇÕES DO FLUXO (SÁBADO PRODUÇÃO) ======
 GRUPOS_ALVO = [
@@ -54,33 +51,25 @@ def clicar_grupo(nome_grupo):
     """Lógica de busca com XPath atualizado para a nova versão do WhatsApp Web."""
     try:
         logging.info(f"🔍 Buscando grupo: {nome_grupo}")
-        
-        # XPATH BLINDADO: Procura pela versão nova (<input>) e pela antiga (<div>)
         xpath_busca = "//input[@data-tab='3'] | //input[contains(@placeholder, 'Pesquisar')] | //div[@contenteditable='true' and @data-tab='3']"
         
+        # Mudado para element_to_be_clickable para evitar o erro 'element not interactable'
         search_box = WebDriverWait(driver, 20).until(
-            EC.presence_of_element_located((By.XPATH, xpath_busca))
+            EC.element_to_be_clickable((By.XPATH, xpath_busca))
         )
         search_box.click()
-        
-        # Limpa o campo de busca
         search_box.send_keys(Keys.CONTROL + "a")
         search_box.send_keys(Keys.BACK_SPACE)
         humanizer.short_human_sleep()
-        
-        # Digita o nome do grupo
         search_box.send_keys(nome_grupo)
         humanizer.human_sleep(4.0, 6.0)
         
-        # Seleciona o grupo na lista
         xpath_result = f"//div[@role='row']//span[@title='{nome_grupo}']"
         grupo = WebDriverWait(driver, 15).until(EC.element_to_be_clickable((By.XPATH, xpath_result)))
         grupo.click()
-        
-        logging.info(f"✅ Grupo aberto: {nome_grupo}")
+        logging.info(f"✅ Entrou no grupo: {nome_grupo}")
         humanizer.short_human_sleep()
         return True
-        
     except Exception as e:
         logging.error(f"Erro ao abrir grupo '{nome_grupo}': {e}")
         return False
@@ -115,22 +104,6 @@ def enviar_msg_chat_simples(mensagem):
     except Exception as e:
         logging.error(f"Erro ao enviar mensagem simples: {e}")
 
-def enviar_msg_chat_multilinha(texto):
-    try:
-        xpath_caixa = "//div[@contenteditable='true' and @role='textbox'] | //footer//div[@contenteditable='true'] | //div[@contenteditable='true'][@data-tab='10']"
-        caixa = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.XPATH, xpath_caixa))
-        )
-        caixa.click()
-        for linha in texto.split('\n'):
-            linha_segura = linha.encode('utf-16', 'surrogatepass').decode('utf-16')
-            caixa.send_keys(linha_segura)
-            caixa.send_keys(Keys.SHIFT, Keys.ENTER)
-        caixa.send_keys(Keys.ENTER)
-        logging.info("✉️ Quantitativos do sábado enviados com sucesso.")
-    except Exception as e: 
-        logging.error(f"Erro ao enviar relatório multilinha: {e}")
-
 def voltar_fechar_paineis():
     try:
         body = driver.find_element(By.TAG_NAME, "body")
@@ -140,17 +113,19 @@ def voltar_fechar_paineis():
     except: pass
 
 # --- FLUXO PRINCIPAL ---
-logging.info("=== INICIANDO FECHAMENTO SÁBADO (QUANTITATIVOS) ===")
+logging.info("=== INICIANDO FECHAMENTO DE SÁBADO ===")
 driver.get("https://web.whatsapp.com")
 
 try:
-    WebDriverWait(driver, 60).until(EC.presence_of_element_located((By.XPATH, "//div[@role='grid']")))
+    # Aumentado para 300 segundos (5 minutos) para garantir carregamento seguro
+    WebDriverWait(driver, 300).until(EC.presence_of_element_located((By.XPATH, "//div[@role='grid']")))
     logging.info("✅ WhatsApp Web carregado com sucesso.")
     time.sleep(10)
 
     grupos_fechados = 0
     grupos_falhados = []
-    
+
+    # 1. PASSA NO GRUPO e FECHA permissões
     for grupo in GRUPOS_ALVO:
         logging.info(f"--- Processando: {grupo} ---")
         if clicar_grupo(grupo):
@@ -161,10 +136,10 @@ try:
                 driver.find_element(By.XPATH, header_xpath).click()
 
                 xpath_perm = "//span[text()='Permissões do grupo']"
-                btn = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, xpath_perm)))
-                driver.execute_script("arguments[0].scrollIntoView(true);", btn)
+                btn_perm = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, xpath_perm)))
+                driver.execute_script("arguments[0].scrollIntoView(true);", btn_perm)
                 humanizer.short_human_sleep()
-                btn.click()
+                btn_perm.click()
 
                 if tentar_fechar_grupo(grupo):
                     grupos_fechados += 1
@@ -185,8 +160,8 @@ try:
             grupos_falhados.append(grupo)
 
     logging.info(f"📊 Resumo: {grupos_fechados}/{len(GRUPOS_ALVO)} grupos processados. Falhados: {grupos_falhados}")
-    
-    # Envia solicitação simples ao grupo de operação
+
+    # 2. ENVIA SOLICITAÇÃO PARA O GRUPO DE OPERAÇÃO
     if clicar_grupo(GRUPO_COORDENACAO):
         logging.info("A enviar solicitação de lista para o grupo de operação...")
         enviar_msg_chat_simples(MENSAGEM_SOLICITAR_LISTA)

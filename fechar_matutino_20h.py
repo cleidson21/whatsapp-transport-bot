@@ -2,18 +2,15 @@ import os
 import time
 import humanizer
 import logging
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
+import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.chrome import ChromeDriverManager
 
 LOG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "whatsapp_automacao.log")
 
-# ====== CONFIGURAÇÃO DE LOGS (NOVO) ======
+# ====== CONFIGURAÇÃO DE LOGS ======
 # Grava tudo na tela E num arquivo de texto para auditoria
 logging.basicConfig(
     level=logging.INFO,
@@ -28,14 +25,15 @@ logging.basicConfig(
 usuario_windows = os.getlogin()
 perfil_path = rf"C:\Users\{usuario_windows}\Documents\WhatsApp_Bot_Profile"
 
-opts = Options()
+# Usamos uc.ChromeOptions() em vez das Options padrão do Selenium
+opts = uc.ChromeOptions()
 opts.add_argument(f"--user-data-dir={perfil_path}")
 opts.add_argument("--profile-directory=Default")
-opts.add_argument("--start-maximized")
-opts.add_experimental_option("excludeSwitches", ["enable-logging"])
 
-service = Service(ChromeDriverManager().install())
-driver = webdriver.Chrome(service=service, options=opts)
+# Inicia o Driver Indetetável
+logging.info("Iniciando o Undetected Chrome...")
+driver = uc.Chrome(options=opts)
+driver.maximize_window()
 
 # ====== CONFIGURAÇÕES DO FLUXO ======
 GRUPOS_ALVO = [
@@ -55,8 +53,9 @@ def clicar_grupo(nome_grupo):
         logging.info(f"🔍 Buscando grupo: {nome_grupo}")
         xpath_busca = "//input[@data-tab='3'] | //input[contains(@placeholder, 'Pesquisar')] | //div[@contenteditable='true' and @data-tab='3']"
         
+        # Mudado para element_to_be_clickable para evitar o erro 'element not interactable'
         search_box = WebDriverWait(driver, 20).until(
-            EC.presence_of_element_located((By.XPATH, xpath_busca))
+            EC.element_to_be_clickable((By.XPATH, xpath_busca))
         )
         search_box.click()
         search_box.send_keys(Keys.CONTROL + "a")
@@ -78,7 +77,6 @@ def clicar_grupo(nome_grupo):
 def tentar_fechar_grupo(nome_grupo):
     try:
         logging.info(f"Procurando o botão de fechar para {nome_grupo}...")
-        # Aumentei o tempo de espera aqui para garantir que o menu carregou
         xpath_switch = "//div[contains(@aria-label, 'mensagens')]//input[@type='checkbox'] | //input[@role='switch' and contains(@aria-label, 'mensagens')]"
         switch = WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.XPATH, xpath_switch)))
         
@@ -106,22 +104,6 @@ def enviar_msg_chat_simples(mensagem):
     except Exception as e:
         logging.error(f"Erro ao enviar mensagem simples: {e}")
 
-def enviar_msg_chat_multilinha(texto):
-    try:
-        xpath_caixa = "//div[@contenteditable='true' and @role='textbox'] | //footer//div[@contenteditable='true'] | //div[@contenteditable='true'][@data-tab='10']"
-        caixa = WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.XPATH, xpath_caixa))
-        )
-        caixa.click()
-        for linha in texto.split('\n'):
-            linha_segura = linha.encode('utf-16', 'surrogatepass').decode('utf-16')
-            caixa.send_keys(linha_segura)
-            caixa.send_keys(Keys.SHIFT, Keys.ENTER)
-        caixa.send_keys(Keys.ENTER)
-        logging.info("✉️ Relatório de quantitativos enviado com sucesso.")
-    except Exception as e: 
-        logging.error(f"Erro ao enviar relatório multilinha: {e}")
-
 def voltar_fechar_paineis():
     try:
         body = driver.find_element(By.TAG_NAME, "body")
@@ -135,7 +117,8 @@ logging.info("=== INICIANDO FECHAMENTO MATUTINO ===")
 driver.get("https://web.whatsapp.com")
 
 try:
-    WebDriverWait(driver, 60).until(EC.presence_of_element_located((By.XPATH, "//div[@role='grid']")))
+    # Aumentado para 300 segundos (5 minutos) para garantir carregamento seguro
+    WebDriverWait(driver, 300).until(EC.presence_of_element_located((By.XPATH, "//div[@role='grid']")))
     logging.info("✅ WhatsApp Web carregado com sucesso.")
     time.sleep(10)
 

@@ -2,14 +2,11 @@ import os
 import time
 import humanizer
 import logging
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
+import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.chrome import ChromeDriverManager
 
 LOG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "whatsapp_automacao.log")
 
@@ -27,17 +24,17 @@ logging.basicConfig(
 usuario_windows = os.getlogin()
 perfil_path = rf"C:\Users\{usuario_windows}\Documents\WhatsApp_Bot_Profile"
 
-opts = Options()
+# Usamos uc.ChromeOptions() em vez das Options padrão do Selenium
+opts = uc.ChromeOptions()
 opts.add_argument(f"--user-data-dir={perfil_path}")
 opts.add_argument("--profile-directory=Default")
-opts.add_argument("--start-maximized")
-opts.add_experimental_option("excludeSwitches", ["enable-logging"])
 
-# Inicia o Driver
-service = Service(ChromeDriverManager().install())
-driver = webdriver.Chrome(service=service, options=opts)
+# Inicia o Driver Indetetável
+logging.info("Iniciando o Undetected Chrome...")
+driver = uc.Chrome(options=opts)
+driver.maximize_window()
 
-# ====== CONFIGURAÇÃO DO AVISO ======
+# ====== CONFIGURAÇÕES DO FLUXO ======
 GRUPOS_ALVO = [
     "Transporte FTC Noturno 2026",
     "Transporte FAN Noturno 2026",
@@ -47,7 +44,9 @@ GRUPOS_ALVO = [
     "Transporte UEFS Noturno 2026",
     "Transporte SENAI-PITAGORAS Noturno 2026"
 ]
-MENSAGEM_AVISO = "⚠️ *ATENÇÃO - Fechamento de Lista Noturna em 30 minutos* ⚠️"
+MENSAGEM_AVISO = "⚠️ *Aviso Sistema*: Lista fecha em 30 minutos!"
+
+# --- FUNÇÕES DE NAVEGAÇÃO WHATSAPP ---
 
 def clicar_grupo(nome_grupo):
     """Lógica de busca com XPath atualizado para a nova versão do WhatsApp Web."""
@@ -58,34 +57,25 @@ def clicar_grupo(nome_grupo):
         xpath_busca = "//input[@data-tab='3'] | //input[contains(@placeholder, 'Pesquisar')] | //div[@contenteditable='true' and @data-tab='3']"
         
         search_box = WebDriverWait(driver, 20).until(
-            EC.presence_of_element_located((By.XPATH, xpath_busca))
+            EC.element_to_be_clickable((By.XPATH, xpath_busca))
         )
         search_box.click()
-        
-        # Limpa o campo de busca
         search_box.send_keys(Keys.CONTROL + "a")
         search_box.send_keys(Keys.BACK_SPACE)
-        humanizer.short_human_sleep()
-        
-        # Digita o nome do grupo
+        humanizer.human_sleep(0.5, 1.5)
         search_box.send_keys(nome_grupo)
-        humanizer.human_sleep(4.0, 6.0)
         
-        # Seleciona o grupo na lista
         xpath_result = f"//div[@role='row']//span[@title='{nome_grupo}']"
         grupo = WebDriverWait(driver, 15).until(EC.element_to_be_clickable((By.XPATH, xpath_result)))
         grupo.click()
-        
-        logging.info(f"✅ Grupo aberto: {nome_grupo}")
-        humanizer.short_human_sleep()
+        logging.info(f"✅ Entrou no grupo: {nome_grupo}")
         return True
-        
     except Exception as e:
         logging.error(f"Erro ao abrir grupo '{nome_grupo}': {e}")
         return False
 
 def enviar_aviso(nome_grupo):
-    if not clicar_grupo(nome_grupo): return
+    if not clicar_grupo(nome_grupo): return False
     try:
         # Localiza a caixa de texto da conversa aberta
         caixa = WebDriverWait(driver, 10).until(
@@ -96,16 +86,18 @@ def enviar_aviso(nome_grupo):
         caixa.send_keys(Keys.ENTER)
         logging.info(f"✉️ Aviso enviado em: {nome_grupo}")
         humanizer.short_human_sleep()
+        return True
     except Exception as e:
         logging.error(f"Erro ao enviar mensagem em {nome_grupo}: {e}")
+        return False
 
 # --- EXECUÇÃO PRINCIPAL ---
 logging.info("=== INICIANDO AVISOS NOTURNOS (11:30H) ===")
 driver.get("https://web.whatsapp.com")
 
 try:
-    # Aguarda o carregamento da interface (grid de mensagens)
-    WebDriverWait(driver, 60).until(EC.presence_of_element_located((By.XPATH, "//div[@role='grid']")))
+    # Aguarda o carregamento da interface (grid de mensagens) - Limite de 5 min
+    WebDriverWait(driver, 300).until(EC.presence_of_element_located((By.XPATH, "//div[@role='grid']")))
     logging.info("✅ WhatsApp Web carregado com sucesso.")
     humanizer.human_sleep(8.0, 12.0)
 
@@ -113,12 +105,19 @@ try:
     avisos_falhados = []
     
     for grupo in GRUPOS_ALVO:
-        enviar_aviso(grupo)
-    
-    logging.info(f"📊 Avisos processados para {len(GRUPOS_ALVO)} grupos.")
-    humanizer.human_sleep(3.0, 6.0)
+        try:
+            if enviar_aviso(grupo):
+                avisos_enviados += 1
+            else:
+                avisos_falhados.append(grupo)
+        except Exception as e:
+            logging.error(f"Falha ao processar {grupo}: {e}")
+            avisos_falhados.append(grupo)
+
+    logging.info(f"📊 Resumo de Avisos: {avisos_enviados}/{len(GRUPOS_ALVO)} enviados.")
+    if avisos_falhados:
+        logging.info(f"Falhados: {avisos_falhados}")
 
 finally:
-    print("🏁 Rotina de avisos noturnos (11:30h) finalizada.")
-    humanizer.short_human_sleep()
+    logging.info("🏁 Rotina de avisos (11:30H) finalizada.")
     driver.quit()
