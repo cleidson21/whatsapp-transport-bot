@@ -19,8 +19,10 @@ whatsapp_automacao.log
 
 # Tests and local experiments
 Teste/
+.pytest_cache/
 
 # OS/editor files
 .DS_Store
 Thumbs.db
+desktop.ini
 .vscode/
