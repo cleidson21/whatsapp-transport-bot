@@ -29,13 +29,13 @@ headers = {
 
 # ====== CONFIGURAÇÕES DO FLUXO (NOTURNO) ======
 GRUPOS_ALVO = [
-    "Transporte SENAI-PITAGORAS Noturno 2026",
-    "Transporte UEFS Noturno 2026",
-    "Transporte IFBA-UNEF Noturno 2026",
-    "Transporte UNIFACS Noturno 2026",
-    "Transporte FAT Noturno 2026",
+    "Transporte FTC Noturno 2026",
     "Transporte FAN Noturno 2026",
-    "Transporte FTC Noturno 2026"
+    "Transporte FAT Noturno 2026",
+    "Transporte UNIFACS Noturno 2026",
+    "Transporte IFBA-UNEF Noturno 2026",
+    "Transporte UEFS Noturno 2026",
+    "Transporte SENAI-PITAGORAS Noturno 2026"
 ]
 
 GRUPO_COORDENACAO = "Operação Transporte Universitário"

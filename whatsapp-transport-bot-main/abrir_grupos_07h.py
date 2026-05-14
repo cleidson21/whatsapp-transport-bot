@@ -28,7 +28,7 @@ headers = {
 
 # ====== LISTA DE GRUPOS (07H) ======
 GRUPOS_ALVO = [
-    "Transporte UEFS/ FTC/ UFRB 2026",
+    "Transporte UEFS-UFRB 2026",
     "Transporte IFBA-UNEF Matutino 2026",
     "Transporte Matutino (Centro) 2026"
 ]

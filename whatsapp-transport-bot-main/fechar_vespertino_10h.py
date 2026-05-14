@@ -30,9 +30,9 @@ headers = {
 
 # ====== CONFIGURAÇÕES DO FLUXO (VESPERTINO) ======
 GRUPOS_ALVO = [
-    "Transporte UEFS-UFRB 2026",
+    "Transporte Vespertino 2026",
     "Transporte FTC INTEGRAL 2026",
-    "Transporte Vespertino 2026"
+    "Transporte UEFS-UFRB 2026"
 ]
 
 GRUPO_COORDENACAO = os.getenv("WHATSAPP_COORDINATION_GROUP", "Operação Transporte Universitário")

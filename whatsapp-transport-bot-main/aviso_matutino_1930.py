@@ -29,10 +29,10 @@ headers = {
 
 # ====== CONFIGURAÇÕES DO FLUXO ======
 GRUPOS_ALVO = [
-    "Transporte UEFS-UFRB 2026",
-    "Transporte FTC INTEGRAL 2026",
+    "Transporte Matutino (Centro) 2026",
     "Transporte IFBA-UNEF Matutino 2026",
-    "Transporte Matutino (Centro) 2026"
+    "Transporte FTC INTEGRAL 2026",
+    "Transporte UEFS-UFRB 2026"    
 ]
 
 MENSAGEM_AVISO = "⚠️ *Aviso Sistema*: Lista Matutinafecha em 30 minutos!"

@@ -28,6 +28,7 @@ headers = {
 
 # ====== LISTA DE GRUPOS NOTURNOS (17H) ======
 GRUPOS_ALVO = [
+    "Transporte UEFS-UFRB 2026",
     "Transporte SENAI-PITAGORAS Noturno 2026",
     "Transporte UEFS Noturno 2026",
     "Transporte IFBA-UNEF Noturno 2026",
