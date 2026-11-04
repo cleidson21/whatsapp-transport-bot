@@ -1,0 +1,16 @@
+# Abertura
+00 07 * * 1-5 root /usr/local/bin/python /app/whatsapp-transport-bot-main/abrir_grupos_07h.py >> /app/whatsapp-transport-bot-main/whatsapp_api_automacao.log 2>&1
+00 17 * * 1-5 root /usr/local/bin/python /app/whatsapp-transport-bot-main/abrir_grupos_17h.py >> /app/whatsapp-transport-bot-main/whatsapp_api_automacao.log 2>&1
+00 07 * * 6 root /usr/local/bin/python /app/whatsapp-transport-bot-main/abrir_grupo_Sabado.py >> /app/whatsapp-transport-bot-main/whatsapp_api_automacao.log 2>&1
+
+# Avisos
+30 09 * * 1-5 root /usr/local/bin/python /app/whatsapp-transport-bot-main/aviso_vespertino_0930.py >> /app/whatsapp-transport-bot-main/whatsapp_api_automacao.log 2>&1
+30 11 * * 1-5 root /usr/local/bin/python /app/whatsapp-transport-bot-main/aviso_noturno_1130.py >> /app/whatsapp-transport-bot-main/whatsapp_api_automacao.log 2>&1
+30 19 * * 1-5 root /usr/local/bin/python /app/whatsapp-transport-bot-main/aviso_matutino_1930.py >> /app/whatsapp-transport-bot-main/whatsapp_api_automacao.log 2>&1
+
+# Fechamentos
+00 10 * * 1-5 root /usr/local/bin/python /app/whatsapp-transport-bot-main/fechar_vespertino_10h.py >> /app/whatsapp-transport-bot-main/whatsapp_api_automacao.log 2>&1
+00 12 * * 1-5 root /usr/local/bin/python /app/whatsapp-transport-bot-main/fechar_noturno_12h.py >> /app/whatsapp-transport-bot-main/whatsapp_api_automacao.log 2>&1
+00 20 * * 1-5 root /usr/local/bin/python /app/whatsapp-transport-bot-main/fechar_matutino_20h.py >> /app/whatsapp-transport-bot-main/whatsapp_api_automacao.log 2>&1
+00 20 * * 6 root /usr/local/bin/python /app/whatsapp-transport-bot-main/fechar_sabado_20h.py >> /app/whatsapp-transport-bot-main/whatsapp_api_automacao.log 2>&1
+# Linha vazia obrigatória no final do ficheiro cron
