@@ -1,208 +1,142 @@
-# WhatsApp Transport Bot
+# WhatsApp Transport Bot - Hub Centralizado Dockerizado
 
-<<<<<<< HEAD
-Automacao em Python para gerenciar grupos de transporte universitario no WhatsApp Web.
+Sistema automatizado para gerenciamento e moderação de grupos de transporte universitário no WhatsApp utilizando a **Evolution API**, arquitetura unificada em **Docker Compose** e agendamento dinâmico via **`config.json`**.
 
-Este projeto foi pensado para operacao diaria: abrir grupos nos horarios certos, enviar avisos, fechar listas e consolidar quantitativos para a coordenacao.
+---
 
-## O que este projeto faz
+## 🚀 Visão Geral da Arquitetura
 
-- Abre grupos e ativa envio de mensagens (scripts de abertura)
-- Envia avisos antes do fechamento das listas
-- Fecha grupos e solicita listas ao grupo de operação (sem coleta automática)
-- Envia solicitação ao grupo de operação em vez de consolidar automaticamente
+O projeto foi refatorado para funcionar como um **Hub Centralizado**, eliminando scripts estáticos dispersos e agendadores externos. Toda a rotina operacional (abertura de grupos, avisos prévios de fechamento e trancamento com solicitação à coordenação) é executada por um único serviço inteligente (`hub_bot`) integrado aos serviços da Evolution API.
 
-## Funcionalidades principais
+### Componentes da Stack
 
-- Abertura automatica de grupos por turno (manha, tarde, noite e sabado)
-- Fechamento automatizado de permissao de envio nos grupos
-- Captura da ultima lista relevante no chat (com tentativa de expandir "Ler mais")
- - Não captura listas nem processa dados com IA; apenas fecha grupos e envia solicitações
-- Normalizacao de formato da mensagem para evitar marcadores duplicados no WhatsApp
-- Logs de execucao em arquivo e no console para auditoria
-- Reaproveitamento de sessao do WhatsApp Web via perfil fixo do Chrome
+- **`hub_bot`**: Aplicação Python conteinerizada que consome o `config.json`, agenda os turnos via `schedule` e executa as ações com proteção anti-ban (`humanizer`).
+- **`evolution_api`**: API REST para controle e envio de mensagens no WhatsApp via instâncias Baileys.
+- **`evolution_frontend`**: Painel visual de gerenciamento da Evolution API (Evolution Manager).
+- **`postgres`**: Banco de dados relacional para persistência de sessões e dados da Evolution API.
+- **`redis`**: Cache e fila para mensagens e instâncias da Evolution API.
 
-## Novidades recentes
+---
 
-- Bot agora opera em modo seguro: não coleta mensagens nem usa IA; envia solicitações simples ao grupo `Operação Transporte Universitário`.
-- Envio de aviso de fechamento mesmo quando o grupo já está fechado.
-- Seletor de caixa de mensagem mais robusto para envio de mensagens no WhatsApp Web.
+## 📁 Estrutura do Projeto
 
-## Estrutura principal
-
-- `abrir_grupos_07h.py`
-- `abrir_grupos_17h.py`
-- `abrir_grupo_Sabado.py`
-- `aviso_matutino_1930.py`
-- `aviso_vespertino_0930.py`
-- `aviso_noturno_1130.py`
-- `fechar_matutino_20h.py`
-- `fechar_vespertino_10h.py`
-- `fechar_noturno_12h.py`
-- `fechar_sabado_20h.py`
-- `warmup_whatsapp.py`
- 
-## Fluxo operacional (resumo)
-
-1. Scripts de abertura habilitam envio de mensagens nos grupos.
-2. Scripts de aviso notificam o fechamento com antecedencia.
-3. Scripts de fechamento bloqueiam envio e solicitam a lista ao grupo de operação.
-4. A solicitação é enviada ao grupo `Operação Transporte Universitário`.
-
-## Requisitos
-
-- Python 3.10+
-- Google Chrome instalado
-- Conta WhatsApp ja logada no Chrome
-- (Sem necessidade de chave de IA)
-
-## Instalacao
-
-=======
-Automacao em Python para abrir, avisar e fechar grupos de transporte universitario via Evolution API.
-
-O projeto foi organizado para executar tarefas pontuais por horario, com logs locais e configuracao simples para ambiente de teste ou producao.
-
-## Visao geral
-
-- `whatsapp-transport-bot-main/` concentra os scripts de automacao.
-- `servidor-whatsapp/` concentra a pilha de infraestrutura local para a Evolution API.
-- `servidor-whatsapp/docker-compose.yml` sobe a Evolution API, Redis, PostgreSQL e o painel web.
-- Os scripts usam `requests` para consultar grupos e alterar o status de permissao de envio.
-
-## Estrutura principal
-
-- `whatsapp-transport-bot-main/abrir_grupos_07h.py`
-- `whatsapp-transport-bot-main/abrir_grupos_17h.py`
-- `whatsapp-transport-bot-main/abrir_grupo_Sabado.py`
-- `whatsapp-transport-bot-main/aviso_matutino_1930.py`
-- `whatsapp-transport-bot-main/aviso_vespertino_0930.py`
-- `whatsapp-transport-bot-main/aviso_noturno_1130.py`
-- `whatsapp-transport-bot-main/fechar_matutino_20h.py`
-- `whatsapp-transport-bot-main/fechar_vespertino_10h.py`
-- `whatsapp-transport-bot-main/fechar_noturno_12h.py`
-- `whatsapp-transport-bot-main/fechar_sabado_20h.py`
-- `whatsapp-transport-bot-main/humanizer.py`
-
-> Observacao: o antigo fluxo de `warmup` nao faz mais parte da operacao atual e foi removido da estrutura ativa do projeto.
-
-## Dependencias
-
-- Python 3.10 ou superior
-- `requests`
-- Evolution API em execucao local em `http://localhost:8080`
-
-## Instalacao
-
-Crie o ambiente virtual e instale as dependencias:
-
->>>>>>> 5763e32 (Atualiza estrutura e documentacao do projeto)
-```bash
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
+```text
+├── app/
+│   ├── __init__.py
+│   ├── api_client.py    # Cliente HTTP para integração com a Evolution API
+│   ├── humanizer.py     # Pausas randômicas e proteção anti-ban
+│   └── main.py          # Orquestrador central e agendador de turnos
+├── config.json          # Configuração centralizada de turnos, grupos e horários
+├── docker-compose.yml   # Orquestração de todos os serviços (Banco, API e Bot)
+├── Dockerfile           # Imagem Python para execução do hub_bot
+├── requirements.txt     # Dependências Python (requests, schedule)
+├── .env.example         # Exemplo de variáveis de ambiente
+└── README.md            # Documentação da aplicação
 ```
- # WhatsApp Transport Bot
 
-Automacao em Python para abrir, avisar e fechar grupos de transporte universitario via Evolution API.
+---
 
-O projeto foi organizado para executar tarefas pontuais por horario, com logs locais e configuracao simples para ambiente de teste ou producao.
+## ⚙️ Configuração Centralizada (`config.json`)
 
-## Visao geral
+Todos os turnos, grupos de alunos e janelas de horário são centralizados no arquivo `config.json` na raiz do projeto:
 
-- `whatsapp-transport-bot-main/` concentra os scripts de automacao.
-- `servidor-whatsapp/` concentra a pilha de infraestrutura local para a Evolution API.
-- `servidor-whatsapp/docker-compose.yml` sobe a Evolution API, Redis, PostgreSQL e o painel web.
-- Os scripts usam `requests` para consultar grupos e alterar o status de permissao de envio.
+```json
+{
+  "grupo_coordenacao": "Operação Transporte Universitário",
+  "turnos": {
+    "matutino": {
+      "horarios": { "abrir": "07:00", "avisar": "19:30", "fechar": "20:00" },
+      "grupos": [
+        "Transporte Matutino (Centro) 2026",
+        "Transporte IFBA-UNEF Matutino 2026",
+        "Transporte FTC INTEGRAL 2026",
+        "Transporte UEFS-UFRB 2026"
+      ]
+    },
+    "vespertino": {
+      "horarios": { "abrir": "13:00", "avisar": "09:30", "fechar": "10:00" },
+      "grupos": [
+        "Transporte Vespertino 2026",
+        "Transporte FTC INTEGRAL 2026",
+        "Transporte UEFS-UFRB 2026"
+      ]
+    },
+    "noturno": {
+      "horarios": { "abrir": "17:00", "avisar": "11:30", "fechar": "12:00" },
+      "grupos": [
+        "Transporte FTC Noturno 2026",
+        "Transporte FAN Noturno 2026",
+        "Transporte FAT Noturno 2026",
+        "Transporte UNIFACS Noturno 2026",
+        "Transporte IFBA-UNEF Noturno 2026",
+        "Transporte UEFS Noturno 2026",
+        "Transporte SENAI-PITAGORAS Noturno 2026"
+      ]
+    },
+    "sabado": {
+      "horarios": { "abrir": "07:00", "avisar": "19:30", "fechar": "20:00" },
+      "grupos": [
+        "Transporte UEFS Sábado 2026"
+      ]
+    }
+  }
+}
+```
 
-## Estrutura principal
+---
 
-- `whatsapp-transport-bot-main/abrir_grupos_07h.py`
-- `whatsapp-transport-bot-main/abrir_grupos_17h.py`
-- `whatsapp-transport-bot-main/abrir_grupo_Sabado.py`
-- `whatsapp-transport-bot-main/aviso_matutino_1930.py`
-- `whatsapp-transport-bot-main/aviso_vespertino_0930.py`
-- `whatsapp-transport-bot-main/aviso_noturno_1130.py`
-- `whatsapp-transport-bot-main/fechar_matutino_20h.py`
-- `whatsapp-transport-bot-main/fechar_vespertino_10h.py`
-- `whatsapp-transport-bot-main/fechar_noturno_12h.py`
-- `whatsapp-transport-bot-main/fechar_sabado_20h.py`
-- `whatsapp-transport-bot-main/humanizer.py`
+## 🔐 Variáveis de Ambiente (`.env`)
 
-> Observacao: o antigo fluxo de `warmup` nao faz mais parte da operacao atual e foi removido da estrutura ativa do projeto.
-
-## Dependencias
-
-- Python 3.10 ou superior
-- `requests`
-- Evolution API em execucao local em `http://localhost:8080`
-
-## Instalacao
-
-Crie o ambiente virtual e instale as dependencias:
+Crie o arquivo `.env` a partir do modelo `.env.example`:
 
 ```bash
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
+cp .env.example .env
 ```
 
-## Configuracao
+### Mapeamento das Variáveis:
 
-Os scripts principais da pasta `whatsapp-transport-bot-main/` podem ler as variaveis abaixo. Se elas nao forem definidas, usam valores padrao para ambiente local.
+| Variável | Descrição | Exemplo Padrão |
+| :--- | :--- | :--- |
+| `POSTGRES_DATABASE` | Nome do banco de dados PostgreSQL | `evolution` |
+| `POSTGRES_USERNAME` | Usuário do PostgreSQL | `evolution` |
+| `POSTGRES_PASSWORD` | Senha do PostgreSQL | `evolution_secret_pass` |
+| `AUTHENTICATION_API_KEY` | Chave de autenticação global da Evolution API | `Transporte_Universitario_2026_Secreta` |
+| `SERVER_URL` | URL pública da Evolution API | `http://localhost:8080` |
+| `WHATSAPP_API_URL` | URL interna da Evolution API acessível pelo bot | `http://evolution_api:8080` |
+| `WHATSAPP_API_KEY` | Chave da Evolution API utilizada pelo bot | `Transporte_Universitario_2026_Secreta` |
+| `WHATSAPP_INSTANCE` | Nome da instância conectada no WhatsApp | `sec-educ-berimbau` |
+| `WHATSAPP_COORDINATION_GROUP` | (Opcional) Sobrescreve o grupo de coordenação | `Operação Transporte Universitário` |
 
-- `WHATSAPP_API_URL`: endereco da Evolution API
-- `WHATSAPP_API_KEY`: chave de acesso da API
-- `WHATSAPP_INSTANCE`: nome da instancia
-- `WHATSAPP_GROUPS`: lista de grupos separada por ponto e virgula
-- `WHATSAPP_COORDINATION_GROUP`: nome do grupo de coordenação usado nos scripts de fechamento
+---
 
-Exemplo no PowerShell:
+## 🚦 Como Iniciar a Aplicação
 
-```powershell
-$env:WHATSAPP_API_URL = "http://localhost:8080"
-$env:WHATSAPP_API_KEY = "SUA_CHAVE_AQUI"
-$env:WHATSAPP_INSTANCE = "sec-educ-berimbau"
-$env:WHATSAPP_GROUPS = "Transporte UEFS Sábado 2026"
-python .\whatsapp-transport-bot-main\abrir_grupo_Sabado.py
-```
+Com o Docker e Docker Compose instalados em seu ambiente, execute:
 
-## Execucao do servidor
-
-Para subir a pilha da Evolution API:
-
+### 1. Subir todos os serviços com build:
 ```bash
-cd servidor-whatsapp
-docker-compose up -d
+docker compose up -d --build
 ```
 
-## Execucao dos scripts
-
-Exemplos:
-
+### 2. Monitorar os logs do Bot:
 ```bash
-python whatsapp-transport-bot-main/abrir_grupos_07h.py
-python whatsapp-transport-bot-main/aviso_matutino_1930.py
-python whatsapp-transport-bot-main/fechar_noturno_12h.py
+docker compose logs -f hub_bot
 ```
 
-## Logs
+### 3. Acessar o Painel da Evolution API:
+Abra o navegador em: [http://localhost:3000](http://localhost:3000) e conecte a instância via QR Code.
 
-Os scripts registram a execucao em arquivos `.log` no proprio diretorio do projeto. Isso facilita auditoria e depuracao sem depender do console.
+### 4. Parar os serviços:
+```bash
+docker compose down
+```
 
-## Observacoes de operacao
+---
 
-- Os scripts de abertura usam a Evolution API para localizar o JID do grupo pelo nome.
-- Os scripts de aviso e fechamento seguem o mesmo padrao de consulta e atualizacao de status.
-- O helper `humanizer.py` fornece pausas aleatorias para reduzir padroes repetitivos de execucao.
+## 🛡️ Mecanismo Anti-Ban e Comportamento Humanizado
 
-## Seguranca
-
-- Nao commite chaves reais de API.
-- Prefira variaveis de ambiente para credenciais e configuracoes de ambiente.
-- Se a chave estiver exposta em qualquer copia do projeto, gere uma nova imediatamente.
-
-## Licenca
-
-Uso interno e privado.
-- Se a chave estiver exposta em qualquer copia do projeto, gere uma nova imediatamente.
+Para proteger os números de moderação contra bloqueios da Meta, o robô emprega:
+1. **Pausas Humanizadas Aleatórias (`humanizer.py`)**: Intervalos randômicos entre consultas e cliques.
+2. **Intervalo entre Grupos**: Delays simulando atenção humana à tela antes de alterar o próximo grupo.
+3. **Simulação de Digitação (`presence: composing`)**: Simula que o usuário está digitando ativamente no aplicativo durante 3 a 6 segundos antes de disparar avisos.
+4. **Pausa Longa Pós-Fechamento**: Aguarda um tempo variável entre 1 e 7 minutos antes de notificar o grupo da coordenação.

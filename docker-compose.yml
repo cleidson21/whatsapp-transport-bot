@@ -1,11 +1,9 @@
 version: "3.8"
 services:
-  evolution-postgres:
-    container_name: evolution_postgres
+  postgres:
     image: postgres:15
     restart: always
     env_file: .env
-    command: ["postgres", "-c", "max_connections=1000"]
     environment:
       - POSTGRES_DB=${POSTGRES_DATABASE}
       - POSTGRES_USER=${POSTGRES_USERNAME}
@@ -13,67 +11,60 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
-      - evolution-net
+      - hub-net
 
-  evolution-redis:
-    container_name: evolution_redis
+  redis:
     image: redis:latest
     restart: always
     command: redis-server --port 6379 --appendonly yes
     volumes:
-      - evolution_redis:/data
+      - redis_data:/data
     networks:
-      evolution-net:
-        aliases:
-          - evolution-redis
+      - hub-net
 
   evolution_api:
-    container_name: evolution_api
     image: evoapicloud/evolution-api:latest
     restart: always
     depends_on:
-      - evolution-redis
-      - evolution-postgres
+      - redis
+      - postgres
     ports:
       - "8080:8080"
     volumes:
       - evolution_instances:/evolution/instances
     networks:
-      - evolution-net
+      - hub-net
     env_file:
       - .env
 
   evolution_frontend:
-    container_name: evolution_frontend
     image: evoapicloud/evolution-manager:latest
     restart: always
     ports:
       - "3000:80"
     networks:
-      - evolution-net
+      - hub-net
 
-  python_bot:
-    container_name: whatsapp_python_bot
+  hub_bot:
     build: .
     restart: always
     depends_on:
       - evolution_api
     networks:
-      - evolution-net
+      - hub-net
     env_file:
       - .env
     environment:
-      # A MAGIA: Sobrescrevemos o URL para aceder à API por dentro da rede Docker
       - WHATSAPP_API_URL=http://evolution_api:8080
     volumes:
-      # Isto permite que veja os logs em tempo real sem entrar no contentor!
-      - ./whatsapp-transport-bot-main:/app/whatsapp-transport-bot-main
+      - ./app:/bot/app
+      - ./config.json:/bot/config.json
 
 volumes:
   evolution_instances:
-  evolution_redis:
+  redis_data:
   postgres_data:
 
 networks:
-  evolution-net:
+  hub-net:
     driver: bridge

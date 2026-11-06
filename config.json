@@ -1,0 +1,56 @@
+{
+  "grupo_coordenacao": "Operação Transporte Universitário",
+  "turnos": {
+    "matutino": {
+      "horarios": {
+        "abrir": "07:00",
+        "avisar": "19:30",
+        "fechar": "20:00"
+      },
+      "grupos": [
+        "Transporte Matutino (Centro) 2026",
+        "Transporte IFBA-UNEF Matutino 2026",
+        "Transporte FTC INTEGRAL 2026",
+        "Transporte UEFS-UFRB 2026"
+      ]
+    },
+    "vespertino": {
+      "horarios": {
+        "abrir": "13:00",
+        "avisar": "09:30",
+        "fechar": "10:00"
+      },
+      "grupos": [
+        "Transporte Vespertino 2026",
+        "Transporte FTC INTEGRAL 2026",
+        "Transporte UEFS-UFRB 2026"
+      ]
+    },
+    "noturno": {
+      "horarios": {
+        "abrir": "17:00",
+        "avisar": "11:30",
+        "fechar": "12:00"
+      },
+      "grupos": [
+        "Transporte FTC Noturno 2026",
+        "Transporte FAN Noturno 2026",
+        "Transporte FAT Noturno 2026",
+        "Transporte UNIFACS Noturno 2026",
+        "Transporte IFBA-UNEF Noturno 2026",
+        "Transporte UEFS Noturno 2026",
+        "Transporte SENAI-PITAGORAS Noturno 2026"
+      ]
+    },
+    "sabado": {
+      "horarios": {
+        "abrir": "07:00",
+        "avisar": "19:30",
+        "fechar": "20:00"
+      },
+      "grupos": [
+        "Transporte UEFS Sábado 2026"
+      ]
+    }
+  }
+}
