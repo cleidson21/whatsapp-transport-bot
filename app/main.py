@@ -7,8 +7,8 @@ import logging
 import unicodedata
 import schedule
 
-# Garante fuso horário local oficial da Bahia
-os.environ['TZ'] = 'America/Bahia'
+# Ensure local timezone (default: America/Bahia, configurable via TZ env)
+os.environ.setdefault('TZ', 'America/Bahia')
 try:
     time.tzset()
 except AttributeError:
@@ -21,7 +21,7 @@ except ImportError:
     import humanizer
     import api_client
 
-# ====== CONFIGURAÇÃO DE LOGS ======
+# ====== LOGGING CONFIGURATION ======
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(levelname)s] %(message)s',
@@ -31,16 +31,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger("whatsapp_bot")
 
-def carregar_env(caminho=".env"):
-    """Carrega variáveis do arquivo .env se presente e não definido no ambiente."""
-    caminhos = [
-        caminho,
+
+def load_env(env_path=".env"):
+    """Loads environment variables from .env file if present and not already defined."""
+    search_paths = [
+        env_path,
         os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"),
         os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env")
     ]
-    for p in caminhos:
+    for p in search_paths:
         if os.path.exists(p):
-            logger.info(f"Carregando variáveis de ambiente de: {p}")
+            logger.info(f"Loading environment variables from: {p}")
             with open(p, "r", encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
@@ -52,256 +53,338 @@ def carregar_env(caminho=".env"):
                             os.environ[k] = v
             break
 
-def carregar_configuracao():
-    """Carrega as configurações a partir do arquivo config.json."""
-    caminhos = [
+
+def load_config():
+    """Loads configuration from config.json across expected directory paths."""
+    search_paths = [
         os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config.json"),
         os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.json"),
         "config.json"
     ]
-    for p in caminhos:
+    for p in search_paths:
         if os.path.exists(p):
             with open(p, "r", encoding="utf-8") as f:
                 return json.load(f)
-    raise FileNotFoundError("Arquivo config.json não encontrado nas rotas esperadas.")
+    raise FileNotFoundError("Configuration file config.json not found in expected paths.")
 
-def normalizar_texto(texto):
-    """Remove acentos, espaços duplicados e converte para minúsculas."""
-    if not texto:
-        return ""
-    texto_norm = unicodedata.normalize('NFKD', texto).encode('ASCII', 'ignore').decode('utf-8')
-    return " ".join(texto_norm.lower().split())
 
-def gerar_mensagem_aviso(nome_grupo, turno, hora_fechamento):
-    """
-    Gera mensagens de aviso coesas, variadas e naturais.
-    Evita hashes idênticos na Meta sem parecer desconexo.
-    """
-    hora_str = f"{hora_fechamento}h" if hora_fechamento else "em 30 minutos"
-    
-    modelos = [
-        f"⚠️ *Aviso*: A lista do grupo *{nome_grupo}* será encerrada às *{hora_str}*. Caso ainda não tenha confirmado sua presença, por favor assine a lista a tempo.",
-        f"📢 *Atenção Estudantes*: Faltam cerca de 30 minutos para o fechamento da lista (*{nome_grupo}*). O encerramento ocorre pontualmente às *{hora_str}*.",
-        f"⏳ *Comunicado*: Encerramento da lista do *{nome_grupo}* previsto para às *{hora_str}*. Pedimos que confirmem os nomes antes do bloqueio do grupo.",
-        f"🔔 *Lembrete*: A lista de embarque (*{nome_grupo}*) será bloqueada às *{hora_str}*. Não esqueçam de registrar suas confirmações!",
-        f"⚠️ *Aviso Institucional*: Lembramos que o envio de nomes no *{nome_grupo}* estará liberado somente até às *{hora_str}*. Garanta sua confirmação.",
-        f"📢 *Atenção passageiros*: Restam poucos minutos para o encerramento da lista do *{nome_grupo}* (às *{hora_str}*). Por favor, verifiquem suas confirmações na mensagem acima.",
-        f"⏳ *Aviso da Coordenação*: O prazo para colocar o nome na lista de *{nome_grupo}* encerra às *{hora_str}*. Quem for viajar, por favor confirme a tempo."
-    ]
-    return random.choice(modelos)
+def get_shifts_config(config):
+    """Retrieves shifts dictionary supporting both English and Portuguese keys."""
+    return config.get("shifts") or config.get("turnos") or {}
 
-def obter_mensagem_fechamento():
-    """Variação sutil no fechamento para evitar mensagens consecutivas com hash repetido."""
-    modelos = [
-        "❌✖️❌✖️ *Lista Fechada* ❌✖️❌✖️",
-        "🔒 *Lista Fechada* ❌✖️❌✖️",
-        "❌✖️❌✖️ *Lista Encerrada* ❌✖️❌✖️",
-        "🔒 *Lista Encerrada* ❌✖️❌✖️",
-        "❌✖️ *Lista Fechada* - Horário limite atingido ❌✖️"
-    ]
-    return random.choice(modelos)
 
-def obter_mensagem_coordenacao(turno):
-    nomes = {
-        "matutino": "MATUTINO",
-        "vespertino": "VESPERTINO",
-        "noturno": "NOTURNO",
-        "sabado": "SÁBADO"
+def get_coordination_group_name(config):
+    """Retrieves the coordination group name from environment or config."""
+    default = config.get("coordination_group") or config.get("grupo_coordenacao") or "Coordination Dispatch Group"
+    return os.getenv("WHATSAPP_COORDINATION_GROUP", default)
+
+
+def get_shift_details(shifts_data, shift_name):
+    """Retrieves details for a shift, supporting shift name aliases."""
+    shift_aliases = {
+        "morning": ["morning", "matutino"],
+        "matutino": ["morning", "matutino"],
+        "afternoon": ["afternoon", "vespertino"],
+        "vespertino": ["afternoon", "vespertino"],
+        "evening": ["evening", "noturno", "night"],
+        "noturno": ["evening", "noturno", "night"],
+        "saturday": ["saturday", "sabado"],
+        "sabado": ["saturday", "sabado"]
     }
-    nome_fmt = nomes.get(turno.lower(), turno.upper())
-    return f"Por favor, enviar a lista do turno fechado: *{nome_fmt}*."
+    candidates = shift_aliases.get(shift_name.lower(), [shift_name])
+    for candidate in candidates:
+        if candidate in shifts_data:
+            data = shifts_data[candidate]
+            schedules = data.get("schedules") or data.get("horarios") or {}
+            groups = data.get("groups") or data.get("grupos") or []
+            return {
+                "name": candidate,
+                "groups": groups,
+                "schedules": {
+                    "open": schedules.get("open") or schedules.get("abrir"),
+                    "warn": schedules.get("warn") or schedules.get("avisar"),
+                    "close": schedules.get("close") or schedules.get("fechar")
+                }
+            }
+    return None
 
-def encontrar_jid_grupo(todos_grupos, nome_procurado):
-    alvo_norm = normalizar_texto(nome_procurado)
-    for g in todos_grupos:
-        nome_grupo = g.get('subject') or g.get('name') or ""
-        if normalizar_texto(nome_grupo) == alvo_norm:
+
+def normalize_text(text):
+    """Removes accents, double spaces, and converts to lower case."""
+    if not text:
+        return ""
+    normalized = unicodedata.normalize('NFKD', text).encode('ASCII', 'ignore').decode('utf-8')
+    return " ".join(normalized.lower().split())
+
+
+def generate_warning_message(group_name, shift, close_time):
+    """
+    Generates cohesive, varied, and natural warning messages.
+    Prevents identical message hashes across groups to protect against Meta spam filters.
+    """
+    time_str = f"{close_time}" if close_time else "in 30 minutes"
+    
+    templates = [
+        f"⚠️ *Notice*: The roster for *{group_name}* will close at *{time_str}*. If you haven't confirmed your seat yet, please submit your name before the cutoff.",
+        f"📢 *Attention Students*: Approximately 30 minutes remaining before roster cutoff for *{group_name}*. Group messaging closes at *{time_str}*.",
+        f"⏳ *Reminder*: Roster locking for *{group_name}* is scheduled for *{time_str}*. Please ensure all passenger confirmations are entered.",
+        f"🔔 *Transportation Alert*: The boarding roster for *{group_name}* will lock at *{time_str}*. Do not forget to register your seat!",
+        f"⚠️ *Official Notice*: Please be reminded that submissions for *{group_name}* are allowed until *{time_str}*. Confirm your seat promptly.",
+        f"📢 *Attention Passengers*: Only a few minutes remaining before the *{group_name}* roster cutoff (*{time_str}*). Please verify the list above.",
+        f"⏳ *Coordination Dispatch*: Deadline to confirm attendance on *{group_name}* ends at *{time_str}*. Anyone traveling must confirm in time."
+    ]
+    return random.choice(templates)
+
+
+def get_closing_message():
+    """Returns a subtly randomized closing message to avoid repeated content hashes."""
+    templates = [
+        "❌✖️❌✖️ *Roster Closed* ❌✖️❌✖️",
+        "🔒 *Roster Closed* ❌✖️❌✖️",
+        "❌✖️❌✖️ *Submissions Closed* ❌✖️❌✖️",
+        "🔒 *Submissions Locked* ❌✖️❌✖️",
+        "❌✖️ *Roster Closed* - Time limit reached ❌✖️"
+    ]
+    return random.choice(templates)
+
+
+def get_coordination_message(shift):
+    """Generates the roster request message directed to the coordination group."""
+    shift_labels = {
+        "morning": "MORNING",
+        "matutino": "MORNING",
+        "afternoon": "AFTERNOON",
+        "vespertino": "AFTERNOON",
+        "evening": "EVENING",
+        "noturno": "EVENING",
+        "saturday": "SATURDAY",
+        "sabado": "SATURDAY"
+    }
+    label = shift_labels.get(shift.lower(), shift.upper())
+    return f"Please dispatch the final student roster for shift: *{label}*."
+
+
+def find_group_jid(all_groups, target_name):
+    """Finds matching group JID by normalized subject comparison."""
+    target_norm = normalize_text(target_name)
+    for g in all_groups:
+        subject = g.get('subject') or g.get('name') or ""
+        if normalize_text(subject) == target_norm:
             return g.get('id')
     return None
 
-def executar_abertura(turno):
+
+def run_group_opening(shift):
+    """Routine to unlock student groups allowing member messaging."""
     logger.info("=" * 50)
-    logger.info(f"INICIANDO ABERTURA DE GRUPOS - TURNO: {turno.upper()}")
+    logger.info(f"STARTING GROUP OPENING - SHIFT: {shift.upper()}")
     logger.info("=" * 50)
 
-    delay_jitter = random.uniform(15.0, 45.0)
-    logger.info(f"Aguardando jitter humano de {delay_jitter:.1f}s...")
-    time.sleep(delay_jitter)
+    # Initial anti-ban jitter (15s to 45s)
+    jitter = random.uniform(15.0, 45.0)
+    logger.info(f"Applying randomized opening jitter: {jitter:.1f}s...")
+    time.sleep(jitter)
 
-    config = carregar_configuracao()
-    grupos_alvo = config.get("turnos", {}).get(turno, {}).get("grupos", [])
-    if not grupos_alvo:
-        logger.warning(f"Nenhum grupo configurado para o turno '{turno}'.")
+    config = load_config()
+    shifts = get_shifts_config(config)
+    details = get_shift_details(shifts, shift)
+    if not details or not details["groups"]:
+        logger.warning(f"No target groups configured for shift '{shift}'.")
         return
 
-    todos_grupos = api_client.buscar_todos_os_grupos()
-    if not todos_grupos:
-        logger.error("Não foi possível obter grupos da API.")
+    target_groups = details["groups"]
+    all_groups = api_client.fetch_all_groups()
+    if not all_groups:
+        logger.error("Unable to retrieve groups from API. Aborting opening.")
         return
 
-    abertos = 0
-    for i, nome_alvo in enumerate(grupos_alvo):
-        logger.info(f"--- Processando abertura: {nome_alvo} ---")
-        jid = encontrar_jid_grupo(todos_grupos, nome_alvo)
+    opened_count = 0
+    for i, target_name in enumerate(target_groups):
+        logger.info(f"--- Processing opening: {target_name} ---")
+        jid = find_group_jid(all_groups, target_name)
         if jid:
             humanizer.short_human_sleep(1.5, 3.5)
-            if api_client.atualizar_permissao_grupo(jid, abrir=True):
-                abertos += 1
+            if api_client.update_group_permission(jid, open_chat=True):
+                opened_count += 1
         else:
-            logger.warning(f"Grupo '{nome_alvo}' não encontrado no WhatsApp.")
+            logger.warning(f"Group '{target_name}' not found on WhatsApp.")
 
-        if i < len(grupos_alvo) - 1:
+        if i < len(target_groups) - 1:
             humanizer.look_at_screen_pause(12.0, 25.0)
 
-    logger.info(f"Resumo Abertura ({turno}): {abertos}/{len(grupos_alvo)} abertos.")
+    logger.info(f"Opening Summary ({shift}): {opened_count}/{len(target_groups)} opened.")
 
-def executar_aviso(turno):
+
+def run_group_warning(shift):
+    """Routine to send advance cutoff warnings across shift groups."""
     logger.info("=" * 50)
-    logger.info(f"INICIANDO AVISO DE FECHAMENTO - TURNO: {turno.upper()}")
+    logger.info(f"STARTING ADVANCE CUTOFF WARNING - SHIFT: {shift.upper()}")
     logger.info("=" * 50)
 
-    # Jitter humano antes de iniciar os avisos (5 a 20s)
-    delay_jitter = random.uniform(5.0, 20.0)
-    logger.info(f"Aguardando jitter humano de {delay_jitter:.1f}s...")
-    time.sleep(delay_jitter)
+    # Pre-execution jitter (5s to 20s)
+    jitter = random.uniform(5.0, 20.0)
+    logger.info(f"Applying randomized warning jitter: {jitter:.1f}s...")
+    time.sleep(jitter)
 
-    config = carregar_configuracao()
-    turno_info = config.get("turnos", {}).get(turno, {})
-    grupos_alvo = turno_info.get("grupos", [])
-    hora_fechamento = turno_info.get("horarios", {}).get("fechar", "")
-    
-    if not grupos_alvo:
+    config = load_config()
+    shifts = get_shifts_config(config)
+    details = get_shift_details(shifts, shift)
+    if not details or not details["groups"]:
         return
 
-    todos_grupos = api_client.buscar_todos_os_grupos()
-    if not todos_grupos:
+    target_groups = details["groups"]
+    close_time = details["schedules"].get("close", "")
+
+    all_groups = api_client.fetch_all_groups()
+    if not all_groups:
         return
 
-    for i, nome_alvo in enumerate(grupos_alvo):
-        logger.info(f"--- Processando aviso: {nome_alvo} ---")
-        jid = encontrar_jid_grupo(todos_grupos, nome_alvo)
+    for i, target_name in enumerate(target_groups):
+        logger.info(f"--- Processing warning: {target_name} ---")
+        jid = find_group_jid(all_groups, target_name)
         if jid:
-            # Mensagem gerada individualmente para este grupo
-            msg = gerar_mensagem_aviso(nome_alvo, turno, hora_fechamento)
-            delay_digitando = random.randint(4000, 7500)
-            api_client.enviar_mensagem(jid, msg, delay_ms=delay_digitando)
+            message = generate_warning_message(target_name, shift, close_time)
+            typing_delay = random.randint(4000, 7500)
+            api_client.send_message(jid, message, delay_ms=typing_delay)
 
-        if i < len(grupos_alvo) - 1:
-            # Pausa humanizada entre grupos (15 a 35s)
+        if i < len(target_groups) - 1:
             humanizer.look_at_screen_pause(15.0, 35.0)
 
-def executar_fechamento(turno):
+
+def run_group_closing(shift):
+    """
+    Roster cutoff routine:
+    1. Locks group chat (announcement mode: admins only).
+    2. Broadcasts randomized closing notice.
+    3. Executes operational cooldown pause (1 to 5 minutes).
+    4. Pings coordination dispatch group requesting the finalized list.
+    """
     logger.info("=" * 50)
-    logger.info(f"INICIANDO FECHAMENTO DE GRUPOS - TURNO: {turno.upper()}")
+    logger.info(f"STARTING GROUP LOCKING - SHIFT: {shift.upper()}")
     logger.info("=" * 50)
 
-    config = carregar_configuracao()
-    grupos_alvo = config.get("turnos", {}).get(turno, {}).get("grupos", [])
-    grupo_coord = os.getenv("WHATSAPP_COORDINATION_GROUP", config.get("grupo_coordenacao", "Operação Transporte Universitário"))
-
-    todos_grupos = api_client.buscar_todos_os_grupos()
-    if not todos_grupos:
+    config = load_config()
+    shifts = get_shifts_config(config)
+    details = get_shift_details(shifts, shift)
+    if not details or not details["groups"]:
         return
 
-    # 1. Trancar grupos e mandar mensagem de encerramento humanizada
-    for i, nome_alvo in enumerate(grupos_alvo):
-        logger.info(f"--- Processando fechamento: {nome_alvo} ---")
-        jid = encontrar_jid_grupo(todos_grupos, nome_alvo)
+    target_groups = details["groups"]
+    coordination_group = get_coordination_group_name(config)
+
+    all_groups = api_client.fetch_all_groups()
+    if not all_groups:
+        return
+
+    # 1. Lock student groups & broadcast closing announcement
+    for i, target_name in enumerate(target_groups):
+        logger.info(f"--- Processing lock: {target_name} ---")
+        jid = find_group_jid(all_groups, target_name)
         if jid:
-            if api_client.atualizar_permissao_grupo(jid, abrir=False):
+            if api_client.update_group_permission(jid, open_chat=False):
                 humanizer.short_human_sleep(1.0, 2.5)
                 delay = random.randint(3000, 5000)
-                msg_fechamento = obter_mensagem_fechamento()
-                api_client.enviar_mensagem(jid, msg_fechamento, delay_ms=delay)
+                closing_msg = get_closing_message()
+                api_client.send_message(jid, closing_msg, delay_ms=delay)
 
-        if i < len(grupos_alvo) - 1:
+        if i < len(target_groups) - 1:
             humanizer.look_at_screen_pause(10.0, 20.0)
 
-    # 2. Pausa humanizada antes da coordenação (1 a 5 minutos)
-    espera_segundos = random.randint(60, 300)
-    logger.info(f"Aguardando pausa operacional de {espera_segundos // 60}m {espera_segundos % 60}s antes de pedir lista...")
-    time.sleep(espera_segundos)
+    # 2. Operational cooldown before pinging dispatch (1 to 5 minutes)
+    cooldown_seconds = random.randint(60, 300)
+    logger.info(f"Cooling down {cooldown_seconds // 60}m {cooldown_seconds % 60}s before notifying coordination...")
+    time.sleep(cooldown_seconds)
 
-    # 3. Notificar coordenação
-    jid_coord = encontrar_jid_grupo(todos_grupos, grupo_coord)
+    # 3. Notify coordination dispatch group
+    jid_coord = find_group_jid(all_groups, coordination_group)
     if jid_coord:
-        msg_coord = obter_mensagem_coordenacao(turno)
-        api_client.enviar_mensagem(jid_coord, msg_coord, delay_ms=random.randint(3000, 5000))
-        logger.info("Mensagem enviada para a Coordenação com sucesso.")
+        coord_msg = get_coordination_message(shift)
+        api_client.send_message(jid_coord, coord_msg, delay_ms=random.randint(3000, 5000))
+        logger.info("Coordination dispatch group notified successfully.")
     else:
-        logger.error(f"Grupo de Coordenação '{grupo_coord}' não foi encontrado.")
+        logger.error(f"Coordination group '{coordination_group}' not found.")
 
-def executar_com_seguranca(funcao, turno, acao):
+
+def safe_execute(func, shift, action):
+    """Executes a routine with exception safety so one failure does not halt the daemon."""
     try:
-        funcao(turno)
+        func(shift)
     except Exception as e:
-        logger.error(f"Erro ao executar '{acao}' do turno '{turno}': {e}", exc_info=True)
+        logger.error(f"Error executing '{action}' for shift '{shift}': {e}", exc_info=True)
 
-def registrar_tarefa(dia_nome, horario, funcao, turno_nome, acao_nome):
-    if not horario:
+
+def register_task(day_name, schedule_time, func, shift_name, action_name):
+    """Registers a scheduled job on a given day and hour."""
+    if not schedule_time:
         return
-    agendador_dia = getattr(schedule.every(), dia_nome)
-    agendador_dia.at(horario).do(executar_com_seguranca, funcao, turno_nome, acao_nome)
+    day_scheduler = getattr(schedule.every(), day_name)
+    day_scheduler.at(schedule_time).do(safe_execute, func, shift_name, action_name)
 
-def agendar_rotinas():
+
+def schedule_routines():
+    """Parses configuration and registers all shift timers."""
     schedule.clear()
-    config = carregar_configuracao()
-    turnos = config.get("turnos", {})
+    config = load_config()
+    shifts = get_shifts_config(config)
 
-    dias_semana = ["monday", "tuesday", "wednesday", "thursday", "friday"]
-    dias_dom_a_qui = ["sunday", "monday", "tuesday", "wednesday", "thursday"]
+    weekdays = ["monday", "tuesday", "wednesday", "thursday", "friday"]
+    sun_to_thu = ["sunday", "monday", "tuesday", "wednesday", "thursday"]
 
-    regras = {
-        "matutino": {
-            "abrir": dias_semana,
-            "avisar": dias_dom_a_qui,
-            "fechar": dias_dom_a_qui
-        },
-        "vespertino": {
-            "abrir": dias_semana,
-            "avisar": dias_semana,
-            "fechar": dias_semana
-        },
-        "noturno": {
-            "abrir": dias_semana,
-            "avisar": dias_semana,
-            "fechar": dias_semana
-        },
-        "sabado": {
-            "abrir": ["thursday"],
-            "avisar": ["friday"],
-            "fechar": ["friday"]
-        }
+    # Dispatch day mapping per shift:
+    # Morning: opened Mon-Fri, warned & locked the night before (Sun-Thu)
+    # Afternoon & Evening: handled same-day Mon-Fri
+    # Saturday: opened Thursday, warned & locked Friday
+    day_rules = {
+        "morning": {"open": weekdays, "warn": sun_to_thu, "close": sun_to_thu},
+        "matutino": {"open": weekdays, "warn": sun_to_thu, "close": sun_to_thu},
+        "afternoon": {"open": weekdays, "warn": weekdays, "close": weekdays},
+        "vespertino": {"open": weekdays, "warn": weekdays, "close": weekdays},
+        "evening": {"open": weekdays, "warn": weekdays, "close": weekdays},
+        "noturno": {"open": weekdays, "warn": weekdays, "close": weekdays},
+        "saturday": {"open": ["thursday"], "warn": ["friday"], "close": ["friday"]},
+        "sabado": {"open": ["thursday"], "warn": ["friday"], "close": ["friday"]}
     }
 
-    for turno_nome, dados in turnos.items():
-        horarios = dados.get("horarios", {})
-        h_abrir = horarios.get("abrir")
-        h_avisar = horarios.get("avisar")
-        h_fechar = horarios.get("fechar")
+    for shift_name, shift_data in shifts.items():
+        schedules = shift_data.get("schedules") or shift_data.get("horarios") or {}
+        time_open = schedules.get("open") or schedules.get("abrir")
+        time_warn = schedules.get("warn") or schedules.get("avisar")
+        time_close = schedules.get("close") or schedules.get("fechar")
 
-        regra_turno = regras.get(turno_nome, {})
-        for dia in regra_turno.get("abrir", []):
-            registrar_tarefa(dia, h_abrir, executar_abertura, turno_nome, "abertura")
-        for dia in regra_turno.get("avisar", []):
-            registrar_tarefa(dia, h_avisar, executar_aviso, turno_nome, "aviso")
-        for dia in regra_turno.get("fechar", []):
-            registrar_tarefa(dia, h_fechar, executar_fechamento, turno_nome, "fechamento")
+        rule = day_rules.get(shift_name.lower(), {"open": weekdays, "warn": weekdays, "close": weekdays})
+        for day in rule.get("open", []):
+            register_task(day, time_open, run_group_opening, shift_name, "open")
+        for day in rule.get("warn", []):
+            register_task(day, time_warn, run_group_warning, shift_name, "warn")
+        for day in rule.get("close", []):
+            register_task(day, time_close, run_group_closing, shift_name, "close")
 
     logger.info("=" * 60)
-    logger.info(f"Agendamento concluído: {len(schedule.get_jobs())} tarefas ativas na grade:")
+    logger.info(f"Scheduling complete: {len(schedule.get_jobs())} active jobs registered:")
     for job in schedule.get_jobs():
         logger.info(f"  • {job}")
     logger.info("=" * 60)
 
+
 def main():
-    carregar_env()
-    logger.info("Iniciando WhatsApp Transport Hub Bot...")
-    agendar_rotinas()
-    logger.info("Monitorando horários...")
+    load_env()
+    logger.info("Starting WhatsApp Transport Hub Bot...")
+    schedule_routines()
+    logger.info("Entering continuous monitoring loop...")
     while True:
         schedule.run_pending()
         time.sleep(1)
+
+
+# Backward-compatibility aliases
+carregar_env = load_env
+carregar_configuracao = load_config
+normalizar_texto = normalize_text
+executar_abertura = run_group_opening
+executar_aviso = run_group_warning
+executar_fechamento = run_group_closing
+agendar_rotinas = schedule_routines
+
 
 if __name__ == "__main__":
     main()
