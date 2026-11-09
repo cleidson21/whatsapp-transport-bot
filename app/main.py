@@ -72,12 +72,34 @@ def normalizar_texto(texto):
     texto_norm = unicodedata.normalize('NFKD', texto).encode('ASCII', 'ignore').decode('utf-8')
     return " ".join(texto_norm.lower().split())
 
-MENSAGEM_FECHAMENTO = "❌✖️❌✖️ *Lista Fechada* ❌✖️❌✖️"
+def gerar_mensagem_aviso(nome_grupo, turno, hora_fechamento):
+    """
+    Gera mensagens de aviso coesas, variadas e naturais.
+    Evita hashes idênticos na Meta sem parecer desconexo.
+    """
+    hora_str = f"{hora_fechamento}h" if hora_fechamento else "em 30 minutos"
+    
+    modelos = [
+        f"⚠️ *Aviso*: A lista do grupo *{nome_grupo}* será encerrada às *{hora_str}*. Caso ainda não tenha confirmado sua presença, por favor assine a lista a tempo.",
+        f"📢 *Atenção Estudantes*: Faltam cerca de 30 minutos para o fechamento da lista (*{nome_grupo}*). O encerramento ocorre pontualmente às *{hora_str}*.",
+        f"⏳ *Comunicado*: Encerramento da lista do *{nome_grupo}* previsto para às *{hora_str}*. Pedimos que confirmem os nomes antes do bloqueio do grupo.",
+        f"🔔 *Lembrete*: A lista de embarque (*{nome_grupo}*) será bloqueada às *{hora_str}*. Não esqueçam de registrar suas confirmações!",
+        f"⚠️ *Aviso Institucional*: Lembramos que o envio de nomes no *{nome_grupo}* estará liberado somente até às *{hora_str}*. Garanta sua confirmação.",
+        f"📢 *Atenção passageiros*: Restam poucos minutos para o encerramento da lista do *{nome_grupo}* (às *{hora_str}*). Por favor, verifiquem suas confirmações na mensagem acima.",
+        f"⏳ *Aviso da Coordenação*: O prazo para colocar o nome na lista de *{nome_grupo}* encerra às *{hora_str}*. Quem for viajar, por favor confirme a tempo."
+    ]
+    return random.choice(modelos)
 
-def obter_mensagem_aviso(turno):
-    if turno.lower() == "matutino":
-        return "⚠️ *Aviso Sistema*: Lista Matutina fecha em 30 minutos!"
-    return f"⚠️ *Aviso Sistema*: Lista {turno.capitalize()} fecha em 30 minutos!"
+def obter_mensagem_fechamento():
+    """Variação sutil no fechamento para evitar mensagens consecutivas com hash repetido."""
+    modelos = [
+        "❌✖️❌✖️ *Lista Fechada* ❌✖️❌✖️",
+        "🔒 *Lista Fechada* ❌✖️❌✖️",
+        "❌✖️❌✖️ *Lista Encerrada* ❌✖️❌✖️",
+        "🔒 *Lista Encerrada* ❌✖️❌✖️",
+        "❌✖️ *Lista Fechada* - Horário limite atingido ❌✖️"
+    ]
+    return random.choice(modelos)
 
 def obter_mensagem_coordenacao(turno):
     nomes = {
@@ -129,7 +151,7 @@ def executar_abertura(turno):
             logger.warning(f"Grupo '{nome_alvo}' não encontrado no WhatsApp.")
 
         if i < len(grupos_alvo) - 1:
-            humanizer.look_at_screen_pause(10.0, 20.0)
+            humanizer.look_at_screen_pause(12.0, 25.0)
 
     logger.info(f"Resumo Abertura ({turno}): {abertos}/{len(grupos_alvo)} abertos.")
 
@@ -138,8 +160,16 @@ def executar_aviso(turno):
     logger.info(f"INICIANDO AVISO DE FECHAMENTO - TURNO: {turno.upper()}")
     logger.info("=" * 50)
 
+    # Jitter humano antes de iniciar os avisos (5 a 20s)
+    delay_jitter = random.uniform(5.0, 20.0)
+    logger.info(f"Aguardando jitter humano de {delay_jitter:.1f}s...")
+    time.sleep(delay_jitter)
+
     config = carregar_configuracao()
-    grupos_alvo = config.get("turnos", {}).get(turno, {}).get("grupos", [])
+    turno_info = config.get("turnos", {}).get(turno, {})
+    grupos_alvo = turno_info.get("grupos", [])
+    hora_fechamento = turno_info.get("horarios", {}).get("fechar", "")
+    
     if not grupos_alvo:
         return
 
@@ -147,16 +177,18 @@ def executar_aviso(turno):
     if not todos_grupos:
         return
 
-    msg = obter_mensagem_aviso(turno)
     for i, nome_alvo in enumerate(grupos_alvo):
         logger.info(f"--- Processando aviso: {nome_alvo} ---")
         jid = encontrar_jid_grupo(todos_grupos, nome_alvo)
         if jid:
-            delay = random.randint(3000, 6000)
-            api_client.enviar_mensagem(jid, msg, delay_ms=delay)
+            # Mensagem gerada individualmente para este grupo
+            msg = gerar_mensagem_aviso(nome_alvo, turno, hora_fechamento)
+            delay_digitando = random.randint(4000, 7500)
+            api_client.enviar_mensagem(jid, msg, delay_ms=delay_digitando)
 
         if i < len(grupos_alvo) - 1:
-            humanizer.look_at_screen_pause(10.0, 20.0)
+            # Pausa humanizada entre grupos (15 a 35s)
+            humanizer.look_at_screen_pause(15.0, 35.0)
 
 def executar_fechamento(turno):
     logger.info("=" * 50)
@@ -171,7 +203,7 @@ def executar_fechamento(turno):
     if not todos_grupos:
         return
 
-    # 1. Trancar grupos e mandar aviso
+    # 1. Trancar grupos e mandar mensagem de encerramento humanizada
     for i, nome_alvo in enumerate(grupos_alvo):
         logger.info(f"--- Processando fechamento: {nome_alvo} ---")
         jid = encontrar_jid_grupo(todos_grupos, nome_alvo)
@@ -179,12 +211,13 @@ def executar_fechamento(turno):
             if api_client.atualizar_permissao_grupo(jid, abrir=False):
                 humanizer.short_human_sleep(1.0, 2.5)
                 delay = random.randint(3000, 5000)
-                api_client.enviar_mensagem(jid, MENSAGEM_FECHAMENTO, delay_ms=delay)
+                msg_fechamento = obter_mensagem_fechamento()
+                api_client.enviar_mensagem(jid, msg_fechamento, delay_ms=delay)
 
         if i < len(grupos_alvo) - 1:
-            humanizer.look_at_screen_pause(10.0, 18.0)
+            humanizer.look_at_screen_pause(10.0, 20.0)
 
-    # 2. Pausa humanizada antes da coordenação
+    # 2. Pausa humanizada antes da coordenação (1 a 5 minutos)
     espera_segundos = random.randint(60, 300)
     logger.info(f"Aguardando pausa operacional de {espera_segundos // 60}m {espera_segundos % 60}s antes de pedir lista...")
     time.sleep(espera_segundos)
@@ -199,14 +232,12 @@ def executar_fechamento(turno):
         logger.error(f"Grupo de Coordenação '{grupo_coord}' não foi encontrado.")
 
 def executar_com_seguranca(funcao, turno, acao):
-    """Garante que falhas isoladas de rede/API não interrompam o agendador global."""
     try:
         funcao(turno)
     except Exception as e:
         logger.error(f"Erro ao executar '{acao}' do turno '{turno}': {e}", exc_info=True)
 
 def registrar_tarefa(dia_nome, horario, funcao, turno_nome, acao_nome):
-    """Cria uma instância isolada no agendador para cada combinação de dia e horário."""
     if not horario:
         return
     agendador_dia = getattr(schedule.every(), dia_nome)
@@ -220,7 +251,6 @@ def agendar_rotinas():
     dias_semana = ["monday", "tuesday", "wednesday", "thursday", "friday"]
     dias_dom_a_qui = ["sunday", "monday", "tuesday", "wednesday", "thursday"]
 
-    # Mapeamento estrito das regras operacionais
     regras = {
         "matutino": {
             "abrir": dias_semana,
