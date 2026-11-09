@@ -45,9 +45,9 @@
     },
     "sabado": {
       "horarios": {
-        "abrir": "07:00",
-        "avisar": "19:30",
-        "fechar": "20:00"
+        "abrir": "17:00",
+        "avisar": "11:30",
+        "fechar": "12:00"
       },
       "grupos": [
         "Transporte UEFS Sábado 2026.2"

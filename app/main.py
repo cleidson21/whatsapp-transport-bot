@@ -7,6 +7,13 @@ import logging
 import unicodedata
 import schedule
 
+# Garante fuso horário local oficial da Bahia
+os.environ['TZ'] = 'America/Bahia'
+try:
+    time.tzset()
+except AttributeError:
+    pass
+
 try:
     from app import humanizer
     from app import api_client
@@ -83,7 +90,6 @@ def obter_mensagem_coordenacao(turno):
     return f"Por favor, enviar a lista do turno fechado: *{nome_fmt}*."
 
 def encontrar_jid_grupo(todos_grupos, nome_procurado):
-    """Encontra o JID do grupo mesmo com pequenas variações de acentuação/espaço."""
     alvo_norm = normalizar_texto(nome_procurado)
     for g in todos_grupos:
         nome_grupo = g.get('subject') or g.get('name') or ""
@@ -96,8 +102,7 @@ def executar_abertura(turno):
     logger.info(f"INICIANDO ABERTURA DE GRUPOS - TURNO: {turno.upper()}")
     logger.info("=" * 50)
 
-    # Jitter humano aleatório (15 a 60s)
-    delay_jitter = random.uniform(15.0, 60.0)
+    delay_jitter = random.uniform(15.0, 45.0)
     logger.info(f"Aguardando jitter humano de {delay_jitter:.1f}s...")
     time.sleep(delay_jitter)
 
@@ -166,7 +171,7 @@ def executar_fechamento(turno):
     if not todos_grupos:
         return
 
-    # 1. Trancar grupos e mandar mensagem de encerramento
+    # 1. Trancar grupos e mandar aviso
     for i, nome_alvo in enumerate(grupos_alvo):
         logger.info(f"--- Processando fechamento: {nome_alvo} ---")
         jid = encontrar_jid_grupo(todos_grupos, nome_alvo)
@@ -179,12 +184,12 @@ def executar_fechamento(turno):
         if i < len(grupos_alvo) - 1:
             humanizer.look_at_screen_pause(10.0, 18.0)
 
-    # 2. Pausa humanizada longa (1 a 7 minutos) antes da coordenação
-    espera_segundos = random.randint(60, 420)
-    logger.info(f"Aguardando pausa operacional de {espera_segundos // 60}m {espera_segundos % 60}s antes de pedir a lista à Coordenação...")
+    # 2. Pausa humanizada antes da coordenação
+    espera_segundos = random.randint(60, 300)
+    logger.info(f"Aguardando pausa operacional de {espera_segundos // 60}m {espera_segundos % 60}s antes de pedir lista...")
     time.sleep(espera_segundos)
 
-    # 3. Notificar o grupo de coordenação
+    # 3. Notificar coordenação
     jid_coord = encontrar_jid_grupo(todos_grupos, grupo_coord)
     if jid_coord:
         msg_coord = obter_mensagem_coordenacao(turno)
@@ -193,17 +198,51 @@ def executar_fechamento(turno):
     else:
         logger.error(f"Grupo de Coordenação '{grupo_coord}' não foi encontrado.")
 
+def executar_com_seguranca(funcao, turno, acao):
+    """Garante que falhas isoladas de rede/API não interrompam o agendador global."""
+    try:
+        funcao(turno)
+    except Exception as e:
+        logger.error(f"Erro ao executar '{acao}' do turno '{turno}': {e}", exc_info=True)
+
+def registrar_tarefa(dia_nome, horario, funcao, turno_nome, acao_nome):
+    """Cria uma instância isolada no agendador para cada combinação de dia e horário."""
+    if not horario:
+        return
+    agendador_dia = getattr(schedule.every(), dia_nome)
+    agendador_dia.at(horario).do(executar_com_seguranca, funcao, turno_nome, acao_nome)
+
 def agendar_rotinas():
+    schedule.clear()
     config = carregar_configuracao()
     turnos = config.get("turnos", {})
 
-    dias_uteis = [
-        schedule.every().monday,
-        schedule.every().tuesday,
-        schedule.every().wednesday,
-        schedule.every().thursday,
-        schedule.every().friday
-    ]
+    dias_semana = ["monday", "tuesday", "wednesday", "thursday", "friday"]
+    dias_dom_a_qui = ["sunday", "monday", "tuesday", "wednesday", "thursday"]
+
+    # Mapeamento estrito das regras operacionais
+    regras = {
+        "matutino": {
+            "abrir": dias_semana,
+            "avisar": dias_dom_a_qui,
+            "fechar": dias_dom_a_qui
+        },
+        "vespertino": {
+            "abrir": dias_semana,
+            "avisar": dias_semana,
+            "fechar": dias_semana
+        },
+        "noturno": {
+            "abrir": dias_semana,
+            "avisar": dias_semana,
+            "fechar": dias_semana
+        },
+        "sabado": {
+            "abrir": ["thursday"],
+            "avisar": ["friday"],
+            "fechar": ["friday"]
+        }
+    }
 
     for turno_nome, dados in turnos.items():
         horarios = dados.get("horarios", {})
@@ -211,23 +250,25 @@ def agendar_rotinas():
         h_avisar = horarios.get("avisar")
         h_fechar = horarios.get("fechar")
 
-        logger.info(f"Registrando '{turno_nome}': Abrir={h_abrir}, Avisar={h_avisar}, Fechar={h_fechar}")
+        regra_turno = regras.get(turno_nome, {})
+        for dia in regra_turno.get("abrir", []):
+            registrar_tarefa(dia, h_abrir, executar_abertura, turno_nome, "abertura")
+        for dia in regra_turno.get("avisar", []):
+            registrar_tarefa(dia, h_avisar, executar_aviso, turno_nome, "aviso")
+        for dia in regra_turno.get("fechar", []):
+            registrar_tarefa(dia, h_fechar, executar_fechamento, turno_nome, "fechamento")
 
-        if turno_nome == "sabado":
-            if h_abrir: schedule.every().saturday.at(h_abrir).do(executar_abertura, "sabado")
-            if h_avisar: schedule.every().saturday.at(h_avisar).do(executar_aviso, "sabado")
-            if h_fechar: schedule.every().saturday.at(h_fechar).do(executar_fechamento, "sabado")
-        else:
-            for dia in dias_uteis:
-                if h_abrir: dia.at(h_abrir).do(executar_abertura, turno_nome)
-                if h_avisar: dia.at(h_avisar).do(executar_aviso, turno_nome)
-                if h_fechar: dia.at(h_fechar).do(executar_fechamento, turno_nome)
+    logger.info("=" * 60)
+    logger.info(f"Agendamento concluído: {len(schedule.get_jobs())} tarefas ativas na grade:")
+    for job in schedule.get_jobs():
+        logger.info(f"  • {job}")
+    logger.info("=" * 60)
 
 def main():
     carregar_env()
     logger.info("Iniciando WhatsApp Transport Hub Bot...")
     agendar_rotinas()
-    logger.info("Agendamentos carregados. Monitorando horários...")
+    logger.info("Monitorando horários...")
     while True:
         schedule.run_pending()
         time.sleep(1)
