@@ -1,0 +1,47 @@
+{
+  "grupo_coordenacao": "Coordination Dispatch Group",
+  "turnos": {
+    "matutino": {
+      "horarios": {
+        "abrir": "07:00",
+        "avisar": "19:30",
+        "fechar": "20:00"
+      },
+      "grupos": [
+        "Transport Morning - Campus 1",
+        "Transport Morning - Campus 2"
+      ]
+    },
+    "vespertino": {
+      "horarios": {
+        "abrir": "13:00",
+        "avisar": "09:30",
+        "fechar": "10:00"
+      },
+      "grupos": [
+        "Transport Afternoon - Route A"
+      ]
+    },
+    "noturno": {
+      "horarios": {
+        "abrir": "17:00",
+        "avisar": "11:30",
+        "fechar": "12:00"
+      },
+      "grupos": [
+        "Transport Evening - University 1",
+        "Transport Evening - University 2"
+      ]
+    },
+    "sabado": {
+      "horarios": {
+        "abrir": "17:00",
+        "avisar": "11:30",
+        "fechar": "12:00"
+      },
+      "grupos": [
+        "Transport Saturday - Route 1"
+      ]
+    }
+  }
+}

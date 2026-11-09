@@ -12,6 +12,7 @@ env/
 # Local environment files
 .env
 api_key_config.py
+config.json
 
 # Logs
 *.log
