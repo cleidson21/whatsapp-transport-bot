@@ -1,4 +1,3 @@
-version: "3.8"
 services:
   postgres:
     image: postgres:15
@@ -12,6 +11,11 @@ services:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - hub-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   redis:
     image: redis:latest
@@ -21,6 +25,11 @@ services:
       - redis_data:/data
     networks:
       - hub-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   evolution_api:
     image: evoapicloud/evolution-api:latest
@@ -36,6 +45,11 @@ services:
       - hub-net
     env_file:
       - .env
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "3"
 
   evolution_frontend:
     image: evoapicloud/evolution-manager:latest
@@ -44,6 +58,11 @@ services:
       - "3000:80"
     networks:
       - hub-net
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
 
   hub_bot:
     build: .
@@ -59,6 +78,11 @@ services:
     volumes:
       - ./app:/bot/app
       - ./config.json:/bot/config.json
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   evolution_instances:

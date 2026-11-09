@@ -120,48 +120,71 @@ def normalize_text(text):
 def generate_warning_message(group_name, shift, close_time):
     """
     Generates cohesive, varied, and natural warning messages.
-    Prevents identical message hashes across groups to protect against Meta spam filters.
+    Supports Portuguese (default) and English via BOT_LANGUAGE.
     """
-    time_str = f"{close_time}" if close_time else "in 30 minutes"
+    lang = os.getenv("BOT_LANGUAGE", "pt").lower()
+    time_str = f"{close_time}h" if close_time else "em 30 minutos"
     
-    templates = [
-        f"⚠️ *Notice*: The roster for *{group_name}* will close at *{time_str}*. If you haven't confirmed your seat yet, please submit your name before the cutoff.",
-        f"📢 *Attention Students*: Approximately 30 minutes remaining before roster cutoff for *{group_name}*. Group messaging closes at *{time_str}*.",
-        f"⏳ *Reminder*: Roster locking for *{group_name}* is scheduled for *{time_str}*. Please ensure all passenger confirmations are entered.",
-        f"🔔 *Transportation Alert*: The boarding roster for *{group_name}* will lock at *{time_str}*. Do not forget to register your seat!",
-        f"⚠️ *Official Notice*: Please be reminded that submissions for *{group_name}* are allowed until *{time_str}*. Confirm your seat promptly.",
-        f"📢 *Attention Passengers*: Only a few minutes remaining before the *{group_name}* roster cutoff (*{time_str}*). Please verify the list above.",
-        f"⏳ *Coordination Dispatch*: Deadline to confirm attendance on *{group_name}* ends at *{time_str}*. Anyone traveling must confirm in time."
-    ]
+    if lang == "en":
+        time_str_en = f"{close_time}" if close_time else "in 30 minutes"
+        templates = [
+            f"⚠️ *Notice*: The roster for *{group_name}* will close at *{time_str_en}*. If you haven't confirmed your seat yet, please submit your name before the cutoff.",
+            f"📢 *Attention Students*: Approximately 30 minutes remaining before roster cutoff for *{group_name}*. Group messaging closes at *{time_str_en}*.",
+            f"⏳ *Reminder*: Roster locking for *{group_name}* is scheduled for *{time_str_en}*. Please ensure all passenger confirmations are entered.",
+            f"🔔 *Transportation Alert*: The boarding roster for *{group_name}* will lock at *{time_str_en}*. Do not forget to register your seat!",
+            f"⚠️ *Official Notice*: Please be reminded that submissions for *{group_name}* are allowed until *{time_str_en}*. Confirm your seat promptly."
+        ]
+    else:
+        templates = [
+            f"⚠️ *Aviso*: A lista do grupo *{group_name}* será encerrada às *{time_str}*. Caso ainda não tenha confirmado sua presença, por favor assine a lista a tempo.",
+            f"📢 *Atenção Estudantes*: Faltam cerca de 30 minutos para o fechamento da lista (*{group_name}*). O encerramento ocorre pontualmente às *{time_str}*.",
+            f"⏳ *Comunicado*: Encerramento da lista do *{group_name}* previsto para às *{time_str}*. Pedimos que confirmem os nomes antes do bloqueio do grupo.",
+            f"🔔 *Lembrete*: A lista de embarque (*{group_name}*) será bloqueada às *{time_str}*. Não esqueçam de registrar suas confirmações!",
+            f"⚠️ *Aviso Institucional*: Lembramos que o envio de nomes no *{group_name}* estará liberado somente até às *{time_str}*. Garanta sua confirmação.",
+            f"📢 *Atenção passageiros*: Restam poucos minutos para o encerramento da lista do *{group_name}* (às *{time_str}*). Por favor, verifiquem suas confirmações na mensagem acima."
+        ]
     return random.choice(templates)
 
 
 def get_closing_message():
     """Returns a subtly randomized closing message to avoid repeated content hashes."""
-    templates = [
-        "❌✖️❌✖️ *Roster Closed* ❌✖️❌✖️",
-        "🔒 *Roster Closed* ❌✖️❌✖️",
-        "❌✖️❌✖️ *Submissions Closed* ❌✖️❌✖️",
-        "🔒 *Submissions Locked* ❌✖️❌✖️",
-        "❌✖️ *Roster Closed* - Time limit reached ❌✖️"
-    ]
+    lang = os.getenv("BOT_LANGUAGE", "pt").lower()
+    if lang == "en":
+        templates = [
+            "❌✖️❌✖️ *Roster Closed* ❌✖️❌✖️",
+            "🔒 *Roster Closed* ❌✖️❌✖️",
+            "❌✖️❌✖️ *Submissions Closed* ❌✖️❌✖️",
+            "🔒 *Submissions Locked* ❌✖️❌✖️",
+            "❌✖️ *Roster Closed* - Time limit reached ❌✖️"
+        ]
+    else:
+        templates = [
+            "❌✖️❌✖️ *Lista Fechada* ❌✖️❌✖️",
+            "🔒 *Lista Fechada* ❌✖️❌✖️",
+            "❌✖️❌✖️ *Lista Encerrada* ❌✖️❌✖️",
+            "🔒 *Lista Encerrada* ❌✖️❌✖️",
+            "❌✖️ *Lista Fechada* - Horário limite atingido ❌✖️"
+        ]
     return random.choice(templates)
 
 
 def get_coordination_message(shift):
     """Generates the roster request message directed to the coordination group."""
-    shift_labels = {
-        "morning": "MORNING",
-        "matutino": "MORNING",
-        "afternoon": "AFTERNOON",
-        "vespertino": "AFTERNOON",
-        "evening": "EVENING",
-        "noturno": "EVENING",
-        "saturday": "SATURDAY",
-        "sabado": "SATURDAY"
+    lang = os.getenv("BOT_LANGUAGE", "pt").lower()
+    shift_labels_pt = {
+        "morning": "MATUTINO",
+        "matutino": "MATUTINO",
+        "afternoon": "VESPERTINO",
+        "vespertino": "VESPERTINO",
+        "evening": "NOTURNO",
+        "noturno": "NOTURNO",
+        "saturday": "SÁBADO",
+        "sabado": "SÁBADO"
     }
-    label = shift_labels.get(shift.lower(), shift.upper())
-    return f"Please dispatch the final student roster for shift: *{label}*."
+    label = shift_labels_pt.get(shift.lower(), shift.upper())
+    if lang == "en":
+        return f"Please dispatch the final student roster for shift: *{label}*."
+    return f"Por favor, enviar a lista do turno fechado: *{label}*."
 
 
 def find_group_jid(all_groups, target_name):
